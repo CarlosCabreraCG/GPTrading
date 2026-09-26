@@ -1,0 +1,14 @@
+{
+  "experiment_id": "wfo_seed42",
+  "saved_at": "2026-09-24T13:54:03.129396+00:00",
+  "n_folds": 1,
+  "csv": "data_files/EURUSD_X_15m_60d.csv",
+  "elapsed_seconds": 4.928802013397217,
+  "config": {
+    "is_ratio": 0.7,
+    "population": 20,
+    "generations": 5,
+    "min_trades": 5,
+    "seed": 42
+  }
+}

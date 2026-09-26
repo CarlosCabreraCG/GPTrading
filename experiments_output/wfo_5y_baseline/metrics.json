@@ -1,0 +1,20 @@
+{
+  "n_folds": 13,
+  "pct_positive_folds": 0.46153846153846156,
+  "mean_fold_return": -4.0876180043345136e-07,
+  "median_fold_return": -6.400038687903731e-08,
+  "worst_fold_return": -7.5760720704698414e-06,
+  "best_fold_return": 7.948113022182568e-06,
+  "std_fold_return": 4.106590412607575e-06,
+  "mean_fold_sharpe": -0.23331494515916232,
+  "median_fold_sharpe": -0.03145059060711224,
+  "worst_fold_sharpe": -4.212201292433127,
+  "best_fold_sharpe": 3.4379623789980336,
+  "total_trades": 243,
+  "mean_trades_per_fold": 18.692307692307693,
+  "worst_fold_dd": -1.0771951407195779e-05,
+  "mean_fold_dd": -5.0011820883574165e-06,
+  "stitched_total_return": -5.3139999889317835e-06,
+  "stitched_sharpe": -0.22256481208913811,
+  "stitched_max_dd": -2.4340890190654996e-05
+}

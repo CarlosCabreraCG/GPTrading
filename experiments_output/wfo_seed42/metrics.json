@@ -1,0 +1,20 @@
+{
+  "n_folds": 1,
+  "pct_positive_folds": 1.0,
+  "mean_fold_return": 1.6715993000904206e-06,
+  "median_fold_return": 1.6715993000904206e-06,
+  "worst_fold_return": 1.6715993000904206e-06,
+  "best_fold_return": 1.6715993000904206e-06,
+  "std_fold_return": 0.0,
+  "mean_fold_sharpe": 7.914121719727295,
+  "median_fold_sharpe": 7.914121719727295,
+  "worst_fold_sharpe": 7.914121719727295,
+  "best_fold_sharpe": 7.914121719727295,
+  "total_trades": 0,
+  "mean_trades_per_fold": 0.0,
+  "worst_fold_dd": -6.749737806455158e-07,
+  "mean_fold_dd": -6.749737806455158e-07,
+  "stitched_total_return": 1.6715993000904206e-06,
+  "stitched_sharpe": 7.914121719727295,
+  "stitched_max_dd": -6.749737806455158e-07
+}
