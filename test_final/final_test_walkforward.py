@@ -40,6 +40,7 @@ if len(folds) > 0:
     result = run_walk_forward(
         df, wf_config, evo_config, fitness_config,
         initial_capital=10_000.0,
+        symbol="EURUSD",
         verbose=True,
     )
     elapsed = time.time() - t0

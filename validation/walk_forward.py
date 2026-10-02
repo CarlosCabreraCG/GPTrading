@@ -48,6 +48,7 @@ class FoldResult:
 @dataclass
 class WalkForwardResult:
     """Resultado completo del WFO."""
+    symbol: str
     fold_results: list[FoldResult] = field(default_factory=list)
     equity_stitched: pd.Series | None = None
     metrics_aggregated: dict = field(default_factory=dict)
@@ -88,6 +89,7 @@ def run_walk_forward(
     wf_config: WFConfig,
     evolution_config: EvolutionConfig,
     fitness_config: FitnessConfig,
+    symbol: str,
     initial_capital: float = 10_000.0,
     verbose: bool = False,
 ) -> WalkForwardResult:
@@ -104,8 +106,13 @@ def run_walk_forward(
     folds = generate_folds(ohlc, wf_config)
     if verbose:
         print(f"Generados {len(folds)} folds")
-
+    if fitness_config.symbol != symbol:
+        raise ValueError(
+            f"symbol={symbol} no coincide con fitness_config.symbol="
+            f"{fitness_config.symbol}"
+        )
     backtest_config = BacktestConfig(
+        symbol=symbol,
         initial_capital=initial_capital,
         costs=fitness_config.costs,
         size=fitness_config.size,
@@ -148,12 +155,7 @@ def run_walk_forward(
             name="signal",
         )
         is_result = run_backtest(
-            df_is, signals_is,
-            BacktestConfig(
-                initial_capital=current_capital,
-                costs=fitness_config.costs,
-                size=fitness_config.size,
-            ),
+            df_is, signals_is,backtest_config
         )
 
         # 5. Evaluar el MISMO individuo en OOS
@@ -163,12 +165,7 @@ def run_walk_forward(
             name="signal",
         )
         oos_result = run_backtest(
-            df_oos, signals_oos,
-            BacktestConfig(
-                initial_capital=current_capital,
-                costs=fitness_config.costs,
-                size=fitness_config.size,
-            ),
+            df_oos, signals_oos,backtest_config
         )
 
         oos_sharpe = _oos_sharpe(oos_result.equity)
@@ -220,6 +217,7 @@ def run_walk_forward(
     metrics_aggregated = _aggregate_metrics(fold_results, equity_stitched)
 
     return WalkForwardResult(
+        symbol=symbol,
         fold_results=fold_results,
         equity_stitched=equity_stitched,
         metrics_aggregated=metrics_aggregated,

@@ -170,10 +170,11 @@ def test_wfo_runs_on_synthetic(synthetic_ohlc):
         mutation_rate=0.2,
         seed=42,
     )
-    fitness_config = FitnessConfig(min_trades=2, max_turnover_ratio=1.0)
+    fitness_config = FitnessConfig(symbol="EURUSD",min_trades=2, max_turnover_ratio=1.0)
 
     result = run_walk_forward(
         synthetic_ohlc, wf_config, evo_config, fitness_config,
+        symbol="EURUSD",
         initial_capital=10_000.0,
     )
 
@@ -190,10 +191,10 @@ def test_wfo_equity_stitched_is_continuous(synthetic_ohlc):
         min_is_size=400, min_oos_size=150,
     )
     evo_config = EvolutionConfig(population_size=10, n_generations=2, seed=1)
-    fitness_config = FitnessConfig(min_trades=2, max_turnover_ratio=1.0)
+    fitness_config = FitnessConfig(symbol="EURUSD",min_trades=2, max_turnover_ratio=1.0)
 
     result = run_walk_forward(
-        synthetic_ohlc, wf_config, evo_config, fitness_config,
+        synthetic_ohlc, wf_config, evo_config, fitness_config,symbol="EURUSD"
     )
 
     eq = result.equity_stitched
@@ -207,10 +208,10 @@ def test_wfo_aggregated_metrics_keys(synthetic_ohlc):
         min_is_size=400, min_oos_size=150,
     )
     evo_config = EvolutionConfig(population_size=10, n_generations=2, seed=1)
-    fitness_config = FitnessConfig(min_trades=2, max_turnover_ratio=1.0)
+    fitness_config = FitnessConfig(symbol="EURUSD",min_trades=2, max_turnover_ratio=1.0)
 
     result = run_walk_forward(
-        synthetic_ohlc, wf_config, evo_config, fitness_config,
+        synthetic_ohlc, wf_config, evo_config, fitness_config,symbol="EURUSD"
     )
     m = result.metrics_aggregated
     for key in [
@@ -228,10 +229,10 @@ def test_wfo_deterministic(synthetic_ohlc):
         min_is_size=400, min_oos_size=150,
     )
     evo_config = EvolutionConfig(population_size=10, n_generations=2, seed=99)
-    fitness_config = FitnessConfig(min_trades=2, max_turnover_ratio=1.0)
+    fitness_config = FitnessConfig(symbol="EURUSD",min_trades=2, max_turnover_ratio=1.0)
 
-    r1 = run_walk_forward(synthetic_ohlc, wf_config, evo_config, fitness_config)
-    r2 = run_walk_forward(synthetic_ohlc, wf_config, evo_config, fitness_config)
+    r1 = run_walk_forward(synthetic_ohlc, wf_config, evo_config, fitness_config,symbol="EURUSD")
+    r2 = run_walk_forward(synthetic_ohlc, wf_config, evo_config, fitness_config,symbol="EURUSD")
 
     assert r1.metrics_aggregated["n_folds"] == r2.metrics_aggregated["n_folds"]
     assert r1.metrics_aggregated["mean_fold_return"] == pytest.approx(

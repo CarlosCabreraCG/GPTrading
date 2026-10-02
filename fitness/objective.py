@@ -34,8 +34,9 @@ from gp.individual import Individual
 class FitnessConfig:
     """Parámetros del fitness."""
     # Backtest
+    symbol: str = "EURUSD" 
     initial_capital: float = 10_000.0
-    costs: CostModel = field(default_factory=lambda: DEFAULT_COSTS)
+    costs: CostModel | None = None 
     size: float = 1.0
 
     # Restricciones
@@ -51,7 +52,11 @@ class FitnessConfig:
     # Métrica principal
     primary_metric: str = "sharpe"    # "sharpe" o "sortino"
 
-
+    def __post_init__(self):
+        if self.costs is None:
+            from config.settings import get_costs
+            object.__setattr__(self, "costs", get_costs(self.symbol))
+            
 # ---------------------------------------------------------------------------
 # Construcción del fitness
 # ---------------------------------------------------------------------------
@@ -68,6 +73,7 @@ def make_fitness_fn(
     callable tenga la firma simple que `evolve` espera.
     """
     backtest_config = BacktestConfig(
+        symbol=config.symbol,
         initial_capital=config.initial_capital,
         costs=config.costs,
         size=config.size,

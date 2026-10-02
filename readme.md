@@ -4,7 +4,7 @@ Sistema de Genetic Programming para descubrir reglas de trading sobre forex.
 Prioriza robustez y generalización sobre rendimiento histórico máximo.
 
 ## Estructura
-rading_gp/
+trading_gp/
 ├── config/ Constantes globales (costes, límites GP, splits)
 ├── data/ Carga, limpieza, split temporal
 ├── features/ Indicadores y motor de features normalizadas
@@ -21,8 +21,9 @@ rading_gp/
 
 ```bash
 pip install -r requirements.txt    # pandas, numpy, pytest, scipy
-Flujo típico de trabajo
 ```
+Flujo típico de trabajo
+
 1. Auditoría del backtester (opcional, pero recomendado antes de confiar en resultados)
 ```bash
 python -m scripts.audit_backtester \
@@ -70,11 +71,11 @@ Tiempo estimado: ~15 min con --population 20 --generations 5, ~1 hora con los de
 
 3. Dry-run de WFO (solo ver folds, sin correr GP)
 ```bash
-python -m scripts.run_wfo \
-    --csv data_files/EURUSD_X_15m_5y.csv \
-    --output experiments_output/wfo_dryrun \
-    --is-months 12 \
-    --oos-months 3 \
+python -m scripts.run_wfo 
+    --csv data_files/EURUSD_X_15m_5y.csv 
+    --output experiments_output/wfo_dryrun 
+    --is-months 12 
+    --oos-months 3 
     --dry-run
 ```
 Genera y reporta los folds, pero no ejecuta GP. Útil para verificar
@@ -82,11 +83,11 @@ que la configuración de WFO es coherente antes de gastar horas.
 
 4. GP simple (sin WFO)
 ```bash
-python -m scripts.run_gp \
-    --csv data_files/EURUSD_X_15m_5y.csv \
-    --output experiments_output/gp_run_001 \
-    --population 50 \
-    --generations 15 \
+python -m scripts.run_gp 
+    --csv data_files/EURUSD_X_15m_5y.csv 
+    --output experiments_output/gp_run_001 
+    --population 50 
+    --generations 15 
     --seed 42
 ```
 Corre GP sobre el dataset completo (sin separar IS/OOS). Útil para
@@ -103,11 +104,11 @@ Si funciona sin reoptimizar, hay evidencia de generalización estructural.
 
 6. Pipeline completo (orquestador)
 ```bash
-python main.py \
-    --csv data_files/EURUSD_X_15m_5y.csv \
-    --output-dir experiments_output \
-    --population 30 \
-    --generations 8 \
+python main.py 
+    --csv data_files/EURUSD_X_15m_5y.csv 
+    --output-dir experiments_output 
+    --population 30 
+    --generations 8 
     --seed 42
 ```
 Llama a run_wfo con la configuración por defecto.
@@ -221,13 +222,3 @@ Tracker para auditar multiple testing.
 Tests que garantizan ausencia de look-ahead.
 
 text
-
----
-
-Cuando tengas el CSV de EURUSD en H4, el flujo es:
-
-1. Ajustar `VELAS_POR_MES` para H4: en forex, 1 mes ≈ 30 × (5/7) × 6 velas/día ≈ **128 velas/mes**. O más simple: 1 año ≈ 1,560 velas H4.
-2. Correr el dry-run con `--is-months 12 --oos-months 3` para ver cuántos folds caben.
-3. Correr el WFO completo.
-
-Si quieres, cuando tengas el CSV de H4 me dices y ajustamos `VELAS_POR_MES` para esa temporalidad antes de correr el dry-run.

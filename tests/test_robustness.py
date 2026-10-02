@@ -56,21 +56,21 @@ def long_individual() -> Individual:
 # ---------------------------------------------------------------------------
 
 def test_evaluate_on_other_data(long_individual, ohlc_1):
-    r = evaluate_on_other_data(long_individual, ohlc_1, label="test")
+    r = evaluate_on_other_data(long_individual, ohlc_1, label="test", symbol="EURUSD")
     assert r.n_bars > 0
     assert r.label == "test"
     assert 1 in r.signals_distribution
 
 
 def test_cross_pair_test(long_individual, ohlc_1, ohlc_2):
-    results = cross_pair_test(long_individual, {"A": ohlc_1, "B": ohlc_2})
+    results = cross_pair_test(long_individual, {"A": ohlc_1, "B": ohlc_2}, {"A": "EURUSD", "B": "XAUUSD"})
     assert len(results) == 2
     assert results[0].label == "A"
     assert results[1].label == "B"
 
 
-def test_summarize_robustness(long_individual, ohlc_1, ohlc_2):
-    results = cross_pair_test(long_individual, {"A": ohlc_1, "B": ohlc_2})
+def test_summarize_robustness( long_individual, ohlc_1, ohlc_2):
+    results = cross_pair_test(long_individual, {"A": ohlc_1, "B": ohlc_2}, {"A": "EURUSD", "B": "XAUUSD"})
     s = summarize_robustness(results)
     assert s["n_tests"] == 2
     assert "mean_sharpe" in s
@@ -98,7 +98,7 @@ def test_split_final_test_zero_ratio(ohlc_1):
 def test_run_final_test(long_individual, ohlc_1, tmp_path):
     config = FinalTestConfig(ratio=0.2, lock_file=tmp_path / "lock.txt")
     dev, final = split_final_test(ohlc_1, config)
-    result = run_final_test(long_individual, final, config)
+    result = run_final_test(long_individual, final, config, symbol="EURUSD")
     assert result.n_bars > 0
     assert config.lock_file.exists()
 
@@ -106,9 +106,9 @@ def test_run_final_test(long_individual, ohlc_1, tmp_path):
 def test_run_final_test_twice_raises(long_individual, ohlc_1, tmp_path):
     config = FinalTestConfig(ratio=0.2, lock_file=tmp_path / "lock.txt")
     dev, final = split_final_test(ohlc_1, config)
-    run_final_test(long_individual, final, config)
+    run_final_test(long_individual, final, config, symbol="EURUSD",)
     with pytest.raises(RuntimeError, match="ya fue ejecutado"):
-        run_final_test(long_individual, final, config)
+        run_final_test(long_individual, final, config, symbol="EURUSD",)
 
 
 # ---------------------------------------------------------------------------
@@ -117,10 +117,11 @@ def test_run_final_test_twice_raises(long_individual, ohlc_1, tmp_path):
 
 def test_tracker_register_and_load(tmp_path):
     path = tmp_path / "tracker.jsonl"
-    tracker = ExperimentTracker(path)
+    tracker = ExperimentTracker(path, symbol="EURUSD")
     assert tracker.n_experiments == 0
 
     tracker.register(
+        symbol="EURUSD",
         config={"a": 1, "b": 2},
         is_metrics={"sharpe": 1.0},
         oos_metrics={"sharpe": 0.5},
@@ -129,15 +130,16 @@ def test_tracker_register_and_load(tmp_path):
     assert path.exists()
 
     # Recargar
-    tracker2 = ExperimentTracker(path)
+    tracker2 = ExperimentTracker(path, symbol="EURUSD")
     assert tracker2.n_experiments == 1
 
 
 def test_tracker_deflated_sharpe(tmp_path):
     path = tmp_path / "tracker.jsonl"
-    tracker = ExperimentTracker(path)
+    tracker = ExperimentTracker(path, symbol="EURUSD")
     for i in range(100):
         tracker.register(
+            symbol="EURUSD",
             config={"seed": i},
             is_metrics={},
             oos_metrics={},

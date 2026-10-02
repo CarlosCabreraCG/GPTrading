@@ -166,7 +166,7 @@ def test_fitness_rejects_flat_individual(flat_ohlc, trivial_ctx):
     ind = Individual(root=tree)
 
     fitness_fn = make_fitness_fn(
-        flat_ohlc, trivial_ctx, FitnessConfig(min_trades=1)
+        flat_ohlc, trivial_ctx, FitnessConfig(symbol="EURUSD",min_trades=1)
     )
     assert fitness_fn(ind) == float("-inf")
 
@@ -177,7 +177,7 @@ def test_fitness_rejects_too_few_trades(trending_ohlc, trivial_ctx):
     ind = Individual(root=tree)
 
     fitness_fn = make_fitness_fn(
-        trending_ohlc, trivial_ctx, FitnessConfig(min_trades=5)
+        trending_ohlc, trivial_ctx, FitnessConfig(symbol="EURUSD",min_trades=5)
     )
     assert fitness_fn(ind) == float("-inf")
 
@@ -210,7 +210,7 @@ def test_fitness_accepts_valid_individual(trending_ohlc):
 
     fitness_fn = make_fitness_fn(
         trending_ohlc, ctx,
-        FitnessConfig(min_trades=2, max_turnover_ratio=1.0)
+        FitnessConfig(symbol="EURUSD",min_trades=2, max_turnover_ratio=1.0)
     )
     f = fitness_fn(ind)
     assert f > float("-inf")
@@ -218,7 +218,7 @@ def test_fitness_accepts_valid_individual(trending_ohlc):
 def test_fitness_deterministic(trending_ohlc, trivial_ctx):
     tree = TreeNode(node=POSITION_LONG, children=[], feature_name=None)
     ind = Individual(root=tree)
-    fn = make_fitness_fn(trending_ohlc, trivial_ctx, FitnessConfig(min_trades=1))
+    fn = make_fitness_fn(trending_ohlc, trivial_ctx, FitnessConfig(symbol="EURUSD",min_trades=1))
     f1 = fn(ind)
     f2 = fn(ind)
     assert f1 == f2
@@ -252,5 +252,5 @@ def test_fitness_handles_evaluation_error():
     )
     ind = Individual(root=if_tree)
 
-    fn = make_fitness_fn(ohlc, ctx, FitnessConfig(min_trades=1))
+    fn = make_fitness_fn(ohlc, ctx, FitnessConfig(symbol="EURUSD",min_trades=1))
     assert fn(ind) == float("-inf")

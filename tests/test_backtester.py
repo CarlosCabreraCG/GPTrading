@@ -275,7 +275,7 @@ def test_engine_signal_executed_next_open(simple_ohlc):
     # Señal: LONG solo en t=0, luego FLAT
     signals = pd.Series([1] + [0] * 9, index=simple_ohlc.index, name="signal")
     result = run_backtest(
-        simple_ohlc, signals, BacktestConfig(initial_capital=10_000.0)
+        simple_ohlc, signals, BacktestConfig(symbol="EURUSD", initial_capital=10_000.0)
     )
     # La posición al close de t=0 debe ser FLAT (aún no se ejecutó)
     assert result.position.iloc[0] == int(Signal.FLAT)
@@ -329,7 +329,7 @@ def test_engine_position_series_matches_signals_shifted(simple_ohlc):
 def test_engine_zero_signals_no_trades(simple_ohlc):
     """Todas las señales FLAT: sin trades, equity constante."""
     signals = pd.Series([0] * 10, index=simple_ohlc.index, name="signal")
-    result = run_backtest(simple_ohlc, signals, BacktestConfig(initial_capital=10_000.0))
+    result = run_backtest(simple_ohlc, signals, BacktestConfig(symbol="EURUSD", initial_capital=10_000.0))
 
     assert result.n_trades == 0
     assert (result.equity == 10_000.0).all()
@@ -344,7 +344,7 @@ def test_engine_costs_reduce_equity(simple_ohlc):
     # LONG en t=0, FLAT en t=1
     signals = pd.Series([1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                         index=simple_ohlc.index, name="signal")
-    result = run_backtest(simple_ohlc, signals, BacktestConfig(initial_capital=10_000.0))
+    result = run_backtest(simple_ohlc, signals, BacktestConfig(symbol="EURUSD", initial_capital=10_000.0))
 
     # Abre LONG al open de t=1 (1.1010), cierra al open de t=2 (1.1020)
     # Gross PnL = 1.1020 - 1.1010 = 0.0010

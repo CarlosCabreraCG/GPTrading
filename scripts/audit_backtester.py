@@ -20,7 +20,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-import numpy as np
+import numpy as np 
 import pandas as pd
 
 from backtest.engine import (
@@ -31,7 +31,7 @@ from backtest.engine import (
 from backtest.execution import TradeRecord
 from config.settings import DEFAULT_COSTS
 from data.cleaner import load_and_clean
-
+from config.settings import SUPPORTED_SYMBOLS, infer_symbol_from_path
 
 def make_simple_signal(n: int, period: int = 100) -> pd.Series:
     """
@@ -129,6 +129,7 @@ def audit_equity(
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--symbol", default=None, help="Símbolo. Si no se pasa, se infiere del nombre del CSV.")
     parser.add_argument("--csv", required=True)
     parser.add_argument("--output", required=True)
     parser.add_argument("--n-bars", type=int, default=2000)
@@ -136,6 +137,17 @@ def main():
                         help="Velas por ciclo LONG/FLAT")
     args = parser.parse_args()
 
+    if args.symbol is None:
+        try:
+            symbol = infer_symbol_from_path(args.csv)
+        except ValueError as e:
+            parser.error(str(e))
+    else:
+        symbol = args.symbol
+        if symbol not in SUPPORTED_SYMBOLS:
+            parser.error(f"--symbol {symbol} no está en {SUPPORTED_SYMBOLS}")
+
+    print(f"Símbolo: {symbol}")
     out_dir = Path(args.output)
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -148,7 +160,7 @@ def main():
     signals.index = df.index
 
     # Backtest con log
-    config = BacktestConfig(initial_capital=10_000.0, costs=DEFAULT_COSTS, size=1.0)
+    config = BacktestConfig(symbol=symbol, initial_capital=10_000.0, costs=DEFAULT_COSTS, size=1.0)
     result, logs = run_backtest_with_log(df, signals, config)
 
     logs_df = logs_to_dataframe(logs)

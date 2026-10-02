@@ -67,6 +67,7 @@ def run_final_test(
     individual: Individual,
     final_test_df: pd.DataFrame,
     config: FinalTestConfig,
+    symbol: str,
     initial_capital: float = 10_000.0,
 ) -> RobustnessResult:
     """
@@ -86,6 +87,7 @@ def run_final_test(
         individual=individual,
         ohlc=final_test_df,
         label="FINAL_TEST",
+        symbol=symbol,
         initial_capital=initial_capital,
     )
 

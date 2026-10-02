@@ -10,7 +10,7 @@ from pathlib import Path
 import pandas as pd
 import yfinance as yf
 
-from config.settings import SYMBOL, INTERVAL, DICT_TEMP, DEFAULT_CSV
+from config.settings import DEFAULT_CSV, SUPPORTED_SYMBOLS, infer_symbol_from_path
 
 def check_format(df):
     if "datetime" not in df.columns:
@@ -31,9 +31,8 @@ def check_format(df):
 
     return df
 
-def download_yf():
-
-    data = yf.download(tickers=SYMBOL, period=DICT_TEMP[INTERVAL], interval=INTERVAL)
+def download_yf(symbol: str = "EURUSD", interval: str = "15m", period: str = "5y"):
+    data = yf.download(tickers=f"{symbol}=X", period=period, interval=interval)
 
     data = data.reset_index()
 
@@ -63,7 +62,7 @@ def load_raw_csv(path: Path | str | None = None) -> pd.DataFrame:
 
     return check_format(df)
 
-def download_load(save: bool = False, path: Path | str | None = None):
+def download_load(symbol: str = "EURUSD", save: bool = False, path: Path | str | None = None):
     df = download_yf()
     df = check_format(df)
     

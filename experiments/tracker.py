@@ -29,6 +29,7 @@ class ExperimentRecord:
     """Un experimento registrado."""
     experiment_id: str
     timestamp: str
+    symbol: str
     config: dict
     is_metrics: dict
     oos_metrics: dict
@@ -48,7 +49,9 @@ def _hash_config(config: dict) -> str:
 class ExperimentTracker:
     """Tracker de experimentos, con persistencia a JSONL."""
     storage_path: Path
+    symbol:str
     records: list[ExperimentRecord] = field(default_factory=list)
+
 
     def __post_init__(self):
         self.storage_path = Path(self.storage_path)
@@ -67,18 +70,20 @@ class ExperimentTracker:
 
     def register(
         self,
+        symbol: str,
         config: dict,
         is_metrics: dict,
         oos_metrics: dict,
         notes: str = "",
     ) -> ExperimentRecord:
         """Registra un experimento y lo persiste."""
-        exp_id = _hash_config(config)
+        exp_id = _hash_config({"symbol": symbol, **config})
         ts = datetime.now(timezone.utc).isoformat()
 
         record = ExperimentRecord(
             experiment_id=exp_id,
             timestamp=ts,
+            symbol=symbol,
             config=config,
             is_metrics=is_metrics,
             oos_metrics=oos_metrics,

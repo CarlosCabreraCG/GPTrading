@@ -27,10 +27,12 @@ from fitness.objective import FitnessConfig
 from gp.evolution import EvolutionConfig
 from validation.folds import WFConfig, generate_folds
 from validation.walk_forward import run_walk_forward
+from config.settings import SUPPORTED_SYMBOLS, infer_symbol_from_path
 
 
 def main():
     parser = argparse.ArgumentParser(description="WFO sobre 5 años de datos.")
+    parser.add_argument("--symbol", default=None, help="Símbolo. Si no se pasa, se infiere del nombre del CSV.")
     parser.add_argument("--csv", required=True)
     parser.add_argument("--output", required=True)
     parser.add_argument("--tracker", default="experiments_output/tracker.jsonl")
@@ -49,6 +51,17 @@ def main():
     parser.add_argument("--oos-months", type=int, default=3)
     args = parser.parse_args()
 
+    if args.symbol is None:
+        try:
+            symbol = infer_symbol_from_path(args.csv)
+        except ValueError as e:
+            parser.error(str(e))
+    else:
+        symbol = args.symbol
+        if symbol not in SUPPORTED_SYMBOLS:
+            parser.error(f"--symbol {symbol} no está en {SUPPORTED_SYMBOLS}")
+
+    print(f"Símbolo: {symbol}")
     # ------------------------------------------------------------------
     # 1. Cargar y limpiar
     # ------------------------------------------------------------------
@@ -80,7 +93,7 @@ def main():
     # ------------------------------------------------------------------
     # 3. Generar folds
     # ------------------------------------------------------------------
-    VELAS_POR_MES = 2100
+    VELAS_POR_MES = 2100 # 2100 para 15m  |  128 por 4H
 
     wf_config = WFConfig(
         is_size=args.is_months * VELAS_POR_MES,
@@ -106,7 +119,9 @@ def main():
         n_generations=args.generations,
         seed=args.seed,
     )
-    fitness_config = FitnessConfig(min_trades=args.min_trades)
+    fitness_config = FitnessConfig(
+        symbol=symbol,
+        min_trades=args.min_trades)
 
     t0 = time.time()
     result = run_walk_forward(
@@ -115,6 +130,7 @@ def main():
         evo_config,
         fitness_config,
         initial_capital=10_000.0,
+        symbol=symbol,
         verbose=True,
     )
     elapsed = time.time() - t0
@@ -133,6 +149,7 @@ def main():
 
     tracker = ExperimentTracker(Path(args.tracker))
     tracker.register(
+        symbol=symbol,
         config={
             "csv": args.csv,
             "is_ratio": args.is_ratio,

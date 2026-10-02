@@ -1,0 +1,6 @@
+*.csv
+.csv
+experiments_output/
+HANDOFF.md
+.env
+otros.py

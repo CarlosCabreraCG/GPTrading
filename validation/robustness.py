@@ -56,6 +56,7 @@ def evaluate_on_other_data(
     individual: Individual,
     ohlc: pd.DataFrame,
     label: str,
+    symbol: str,
     initial_capital: float = 10_000.0,
     fitness_config: FitnessConfig | None = None,
 ) -> RobustnessResult:
@@ -65,8 +66,12 @@ def evaluate_on_other_data(
     No entrena. Solo evalúa la señal y corre el backtest.
     """
     if fitness_config is None:
-        fitness_config = FitnessConfig()
-
+        fitness_config = FitnessConfig(symbol=symbol)
+    if fitness_config.symbol != symbol:
+        raise ValueError(
+            f"symbol={symbol} no coincide con fitness_config.symbol="
+            f"{fitness_config.symbol}"
+        )
     ctx, df_aligned = _build_context(ohlc)
 
     # Evaluar señal
@@ -79,6 +84,7 @@ def evaluate_on_other_data(
 
     # Backtest
     bt_config = BacktestConfig(
+        symbol=symbol,
         initial_capital=initial_capital,
         costs=fitness_config.costs,
         size=fitness_config.size,
@@ -103,6 +109,7 @@ def evaluate_on_other_data(
 def cross_pair_test(
     individual: Individual,
     pairs_data: dict[str, pd.DataFrame],
+    symbol_map: dict[str, str], 
     initial_capital: float = 10_000.0,
 ) -> list[RobustnessResult]:
     """
@@ -113,9 +120,16 @@ def cross_pair_test(
     """
     results = []
     for pair_name, ohlc in pairs_data.items():
+        if pair_name not in symbol_map:
+            raise KeyError(
+                f"Falta symbol para '{pair_name}' en symbol_map. "
+                f"Disponibles: {sorted(symbol_map.keys())}"
+            )
+        sym = symbol_map[pair_name]
         try:
             r = evaluate_on_other_data(
                 individual, ohlc, label=pair_name,
+                symbol=sym,
                 initial_capital=initial_capital,
             )
             results.append(r)
@@ -134,6 +148,7 @@ def cross_pair_test(
 def cross_timeframe_test(
     individual: Individual,
     tf_data: dict[str, pd.DataFrame],
+    symbol_map: dict[str, str],
     initial_capital: float = 10_000.0,
 ) -> list[RobustnessResult]:
     """
@@ -143,9 +158,16 @@ def cross_timeframe_test(
     """
     results = []
     for label, ohlc in tf_data.items():
+        if label not in symbol_map:
+            raise KeyError(
+                f"Falta symbol para '{label}' en symbol_map. "
+                f"Disponibles: {sorted(symbol_map.keys())}"
+            )
+        sym = symbol_map[label]
         try:
             r = evaluate_on_other_data(
                 individual, ohlc, label=label,
+                symbol=sym,
                 initial_capital=initial_capital,
             )
             results.append(r)

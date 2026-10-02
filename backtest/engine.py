@@ -36,10 +36,22 @@ from strategy.signal import Signal, validate_signal_series
 
 @dataclass
 class BacktestConfig:
+    """
+    Configuración del backtest.
+
+    symbol: obligatorio. Determina los costes si costs=None.
+    costs: si None, se resuelve con get_costs(symbol).
+    """
+    symbol: str
     initial_capital: float = 10_000.0
-    costs: CostModel = DEFAULT_COSTS
+    costs: CostModel | None = None
     size: float = 1.0
 
+    def __post_init__(self):
+        if self.costs is None:
+            # Validar símbolo y resolver costes
+            from config.settings import get_costs
+            object.__setattr__(self, "costs", get_costs(self.symbol))
 
 def run_backtest(
     ohlc: pd.DataFrame,
@@ -57,7 +69,7 @@ def run_backtest(
     Devuelve BacktestResult.
     """
     if config is None:
-        config = BacktestConfig()
+        config = BacktestConfig(symbol="EURUSD")
 
     # Validaciones
     if len(ohlc) != len(signals):
@@ -166,7 +178,7 @@ def run_backtest_with_log(
     Útil para auditar el comportamiento del backtester trade por trade.
     """
     if config is None:
-        config = BacktestConfig()
+        config = BacktestConfig(symbol="EURUSD")
 
     if len(ohlc) != len(signals):
         raise ValueError("ohlc y signals con distinta longitud")

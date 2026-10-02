@@ -1,7 +1,7 @@
 import pandas as pd
 
 # 1. Ejemplo de datos como el tuyo
-data = pd.read_csv("data_files/EURUSD_X_15m_60d.csv")
+data = pd.read_csv("data_files/EURUSD_X_15m_5y.csv")
 df = pd.DataFrame(data)
 
 # 2. Convertir la columna datetime a formato datetime de pandas
@@ -24,5 +24,5 @@ df_4h = df.resample('4h').agg(ohlc_dict)
 # 6. Eliminar periodos sin datos (si aplica) y reiniciar índice
 df_4h.dropna(inplace=True)
 df_4h.reset_index(inplace=True)
-df.to_csv("DEFAULT_CSV.csv")
+df_4h.to_csv("DEFAULT_CSV.csv")
 print(df_4h)

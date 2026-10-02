@@ -20,10 +20,12 @@ from fitness.objective import FitnessConfig, make_fitness_fn
 from gp.evaluator import EvalContext
 from gp.evolution import EvolutionConfig, evolve
 from gp.serialization import save_individual
+from config.settings import SUPPORTED_SYMBOLS, infer_symbol_from_path
 
 
 def main():
     parser = argparse.ArgumentParser(description="Corre GP sobre un CSV de velas.")
+    parser.add_argument("--symbol", default=None, help="Símbolo. Si no se pasa, se infiere del nombre del CSV.")
     parser.add_argument("--csv", required=True, help="Ruta al CSV.")
     parser.add_argument("--output", required=True, help="Directorio de salida.")
     parser.add_argument("--population", type=int, default=50)
@@ -35,6 +37,17 @@ def main():
     parser.add_argument("--min-trades", type=int, default=5)
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
+    if args.symbol is None:
+        try:
+            symbol = infer_symbol_from_path(args.csv)
+        except ValueError as e:
+            parser.error(str(e))
+    else:
+        symbol = args.symbol
+        if symbol not in SUPPORTED_SYMBOLS:
+            parser.error(f"--symbol {symbol} no está en {SUPPORTED_SYMBOLS}")
+
+    print(f"Símbolo: {symbol}")
 
     # Cargar y limpiar
     df, report = load_and_clean(args.csv)
@@ -50,7 +63,9 @@ def main():
     )
 
     # Fitness
-    fitness_config = FitnessConfig(min_trades=args.min_trades)
+    fitness_config = FitnessConfig(
+        symbol=symbol,
+        min_trades=args.min_trades)
     fitness_fn = make_fitness_fn(df_aligned, ctx, fitness_config)
 
     # Evolución
@@ -74,6 +89,7 @@ def main():
     save_individual(result.best_individual, out_dir / "best_individual.json")
 
     summary = {
+        "symbol": symbol,
         "best_fitness": result.best_fitness,
         "best_size": result.best_individual.size,
         "best_depth": result.best_individual.depth,
