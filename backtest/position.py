@@ -26,6 +26,7 @@ class Position:
     direction: Signal = Signal.FLAT
     entry_price: Optional[float] = None
     entry_time: Optional[datetime] = None
+    entry_cost: float = 0.0
     size: float = 1.0
 
     @property
@@ -40,7 +41,7 @@ class Position:
     def is_short(self) -> bool:
         return self.direction == Signal.SHORT
 
-    def open(self, direction: Signal, price: float, time: datetime) -> None:
+    def open(self, direction, price, time, entry_cost: float = 0.0) -> None:
         """Abre una posición nueva. Asume que estaba FLAT."""
         if direction == Signal.FLAT:
             raise ValueError("No se puede abrir una posición FLAT.")
@@ -52,12 +53,14 @@ class Position:
         self.direction = direction
         self.entry_price = float(price)
         self.entry_time = time
-
+        self.entry_cost = entry_cost
+        
     def close(self) -> None:
         """Cierra la posición actual y vuelve a FLAT."""
         self.direction = Signal.FLAT
         self.entry_price = None
         self.entry_time = None
+        self.entry_cost = 0.0
 
     def unrealized_pnl(self, current_price: float) -> float:
         """

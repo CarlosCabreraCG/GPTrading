@@ -103,6 +103,8 @@ def compute_metrics(result: BacktestResult) -> dict[str, float]:
     # Profit Factor y Expectancy (sobre trades cerrados)
     if result.trades:
         pnls = np.array([t.net_pnl for t in result.trades])
+        gross_total = sum(t.gross_pnl for t in result.trades)
+        cost_total = sum(t.total_cost for t in result.trades)
         gross_profit = pnls[pnls > 0].sum() if (pnls > 0).any() else 0.0
         gross_loss = -pnls[pnls < 0].sum() if (pnls < 0).any() else 0.0
         profit_factor = gross_profit / gross_loss if gross_loss > 0 else float("inf")
@@ -120,6 +122,8 @@ def compute_metrics(result: BacktestResult) -> dict[str, float]:
         "sortino": float(sortino),
         "max_drawdown": max_dd,
         "calmar": float(calmar),
+        "total_gross_pnl": float(gross_total),
+        "total_cost": float(cost_total),
         "profit_factor": float(profit_factor),
         "expectancy": expectancy,
         "total_return": float(total_ret),

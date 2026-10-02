@@ -357,6 +357,23 @@ def test_engine_costs_reduce_equity(simple_ohlc):
     # El equity final debe reflejar el net
     assert result.equity.iloc[-1] == pytest.approx(expected_equity, abs=1e-9)
 
+def test_net_pnl_equals_gross_minus_total_cost(simple_ohlc):
+    signals = pd.Series([1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                        index=simple_ohlc.index, name="signal")
+    result = run_backtest(simple_ohlc, signals,
+                          BacktestConfig(symbol="EURUSD", initial_capital=10_000.0))
+    for t in result.trades:
+        assert t.total_cost == pytest.approx(t.open_cost + t.close_cost)
+        assert t.net_pnl == pytest.approx(t.gross_pnl - t.total_cost)
+
+def test_equity_final_equals_capital_plus_net(simple_ohlc):
+    signals = pd.Series([1, 0, 1, 0, 0, 0, 0, 0, 0, 0],
+                        index=simple_ohlc.index, name="signal")
+    result = run_backtest(simple_ohlc, signals,
+                          BacktestConfig(symbol="EURUSD", initial_capital=10_000.0))
+    total_net = sum(t.net_pnl for t in result.trades)
+    expected_equity = 10_000.0 + total_net
+    assert result.equity.iloc[-1] == pytest.approx(expected_equity, abs=1e-9)
 
 def test_engine_metrics_are_finite(simple_ohlc):
     signals = pd.Series([1, -1, 1, -1, 0, 0, 1, 0, -1, 0],

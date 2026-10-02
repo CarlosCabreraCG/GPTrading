@@ -31,7 +31,9 @@ class TradeRecord:
     exit_price: float | None
     size: float
     gross_pnl: float
-    cost: float
+    open_cost: float
+    close_cost: float
+    total_cost: float
     net_pnl: float
 
 
@@ -88,6 +90,7 @@ def apply_transition(
     if from_direction != Signal.FLAT:
         entry_price = state.position.entry_price
         entry_time = state.position.entry_time
+        entry_cost = state.position.entry_cost
         if entry_price is None or entry_time is None:
             raise RuntimeError("Posición no FLAT sin entry_price/entry_time")
 
@@ -101,7 +104,8 @@ def apply_transition(
         # contable, atribuimos a esta operación solo la parte de cierre.
         # El coste de apertura ya se descontó del cash en su momento.
         close_cost = breakdown.close_cost + breakdown.commission / 2.0
-        net = gross - close_cost
+        total_cost = entry_cost + close_cost
+        net = gross - total_cost
 
         trade_record = TradeRecord(
             entry_time=entry_time,
@@ -111,7 +115,9 @@ def apply_transition(
             exit_price=execution_price,
             size=size,
             gross_pnl=gross,
-            cost=close_cost,
+            open_cost=entry_cost,
+            close_cost=close_cost,
+            total_cost=total_cost,
             net_pnl=net,
         )
 
@@ -121,7 +127,10 @@ def apply_transition(
 
     # 3. Abrir nueva posición (si no es FLAT)
     if target_direction != Signal.FLAT:
-        state.position.open(target_direction, execution_price, execution_time)
+        one_side_cost = size * (costs.spread / 2 + costs.slippage)
+        open_cost_for_new = one_side_cost + size * costs.commission_per_trade / 2.0
+        state.position.open(target_direction, execution_price, execution_time,
+                            entry_cost=open_cost_for_new)
 
     # 4. Descontar costes totales del cash
     state.cash -= breakdown.total
