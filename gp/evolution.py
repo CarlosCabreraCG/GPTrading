@@ -147,7 +147,22 @@ def evolve(
         pop = new_pop
 
     if best_ind is None:
-        raise RuntimeError("La evolución no produjo ningún individuo válido")
+        # Ningún individuo superó el fitness. Devolvemos el primero de la
+        # población inicial con best_fitness=-inf. Esto permite que el WFO
+        # registre el fold como fallido y siga, en lugar de abortar.
+        fallback = pop.individuals[0] if pop.individuals else None
+        if fallback is None:
+            raise RuntimeError(
+                "La evolución no produjo ningún individuo. Población vacía."
+            )
+        return EvolutionResult(
+            best_individual=fallback,
+            best_fitness=float("-inf"),
+            history_best=history_best,
+            history_mean=history_mean,
+            history_std=history_std,
+            generations=config.n_generations,
+        )
 
     return EvolutionResult(
         best_individual=best_ind,

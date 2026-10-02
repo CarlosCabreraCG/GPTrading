@@ -162,8 +162,8 @@ def test_wfo_runs_on_synthetic(synthetic_ohlc):
         min_is_size=400, min_oos_size=150,
     )
     evo_config = EvolutionConfig(
-        population_size=10,
-        n_generations=3,
+        population_size=20,
+        n_generations=2,
         tournament_size=3,
         n_elites=1,
         crossover_rate=0.8,
@@ -261,3 +261,37 @@ def test_aggregate_metrics_pct_positive():
     assert m["n_folds"] == 3
     assert m["pct_positive_folds"] == 1.0
     assert m["mean_fold_return"] == pytest.approx(0.01)
+
+def test_wfo_uses_different_seed_per_fold(synthetic_ohlc, monkeypatch):
+    """
+    Verifica que cada fold usa una semilla distinta.
+    Se intercepta evolve para capturar las semillas usadas.
+    """
+    from validation import walk_forward as wf_module
+    captured_seeds = []
+
+    original_evolve = wf_module.evolve
+    def spy_evolve(fitness_fn, config, grammar=None):
+        captured_seeds.append(config.seed)
+        return original_evolve(fitness_fn, config, grammar)
+
+    monkeypatch.setattr(wf_module, "evolve", spy_evolve)
+
+    wf_config = WFConfig(
+        is_size=500, oos_size=200,
+        min_is_size=400, min_oos_size=150,
+    )
+    evo_config = EvolutionConfig(population_size=5, n_generations=1, seed=1000)
+    fitness_config = FitnessConfig(symbol="EURUSD", min_trades=2, max_turnover_ratio=1.0)
+
+    run_walk_forward(
+        synthetic_ohlc, wf_config, evo_config, fitness_config,
+        symbol="EURUSD",
+    )
+
+    # Debe haber una semilla por fold, todas distintas
+    assert len(captured_seeds) == len(set(captured_seeds))
+    # La primera debe ser 1000 + 0 = 1000
+    assert captured_seeds[0] == 1000
+    # La segunda debe ser 1000 + 1 = 1001
+    assert captured_seeds[1] == 1001

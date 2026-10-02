@@ -29,7 +29,7 @@ from features.engine import compute_features, drop_warmup_rows
 from gp.evaluator import EvalContext
 from gp.evolution import EvolutionConfig, EvolutionResult, evolve
 from validation.folds import Fold, WFConfig, generate_folds
-
+from dataclasses import replace
 
 @dataclass
 class FoldResult:
@@ -137,10 +137,12 @@ def run_walk_forward(
         # 2. Fitness sobre IS
         fitness_fn = make_fitness_fn(df_is, ctx_is, fitness_config)
 
+        base_seed = evolution_config.seed if evolution_config.seed is not None else 0
+        fold_evo_config = replace(evolution_config, seed=base_seed + fold.index)
         # 3. Evolución en IS
         evo_result: EvolutionResult = evolve(
             fitness_fn=fitness_fn,
-            config=evolution_config,
+            config=fold_evo_config,
             grammar=__import__("gp.grammar", fromlist=["DEFAULT_GRAMMAR"]).DEFAULT_GRAMMAR,
         )
 
