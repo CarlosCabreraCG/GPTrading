@@ -38,6 +38,7 @@ MAX_ABS_VALUE: Final[float] = 1e6
 
 SUPPORTED_SYMBOLS: Final[tuple[str, ...]] = (
     "EURUSD",
+    "GBPUSD",
     "XAUUSD",
     "XAGUSD",
     "WTI",
@@ -112,6 +113,7 @@ _DEFAULT_COSTS: dict[str, CostModel] = {
     "XAUUSD": CostModel(spread=0.30, slippage=0.10, commission_per_trade=0.0),
     "XAGUSD": CostModel(spread=0.03, slippage=0.01, commission_per_trade=0.0),
     "EURUSD": CostModel(spread=0.00010, slippage=0.00003, commission_per_trade=0.0),
+    "GBPUSD": CostModel(spread=0.00012, slippage=0.00004, commission_per_trade=0.0), 
     "WTI":    CostModel(spread=0.03, slippage=0.01, commission_per_trade=0.0),
     "BRENT":  CostModel(spread=0.03, slippage=0.01, commission_per_trade=0.0),
     "USA500": CostModel(spread=0.50, slippage=0.20, commission_per_trade=0.0),

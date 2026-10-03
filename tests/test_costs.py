@@ -83,3 +83,8 @@ def test_backtest_config_accepts_explicit_costs():
 def test_backtest_config_requires_symbol():
     with pytest.raises(TypeError):
         BacktestConfig()
+
+
+def test_supported_symbols_has_expected():
+    expected = {"EURUSD", "GBPUSD", "XAUUSD", "XAGUSD", "WTI", "BRENT", "USA500", "USATECH"}
+    assert set(SUPPORTED_SYMBOLS) == expected

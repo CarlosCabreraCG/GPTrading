@@ -102,6 +102,19 @@ python -m scripts.evaluate_strategy \
 Evalúa un individuo ya entrenado sobre otros pares, sin reajustar.
 Si funciona sin reoptimizar, hay evidencia de generalización estructural.
 
+Correr todos menos oro
+
+```bash
+    python -m scripts.run_all_wfo --skip gold
+```
+
+Correr todos menos 
+
+```bash
+    python -m scripts.run_all_wfo
+```
+
+
 6. Pipeline completo (orquestador)
 ```bash
 python main.py 

@@ -152,7 +152,7 @@ def main():
     with (out_dir / "metrics.json").open("w", encoding="utf-8") as f:
         json.dump(result.metrics_aggregated, f, indent=2, default=str)
 
-    tracker = ExperimentTracker(Path(args.tracker))
+    tracker = ExperimentTracker(symbol=symbol,storage_path=Path(args.tracker))
     tracker.register(
         symbol=symbol,
         config={
