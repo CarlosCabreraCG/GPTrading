@@ -156,6 +156,55 @@ def test_complexity_weights_affect_result():
     assert complexity_penalty(ind, w2) > complexity_penalty(ind, w1)
 
 
+def test_fitness_logs_error_and_counts(trending_ohlc, caplog):
+    """Un individuo que pide una feature inexistente debe loguear y contar."""
+    import logging
+    n = 100
+    ctx = EvalContext(features={"x": np.ones(n)}, n=n)
+
+    from gp.grammar import FEATURE_TERMINALS
+    from gp.nodes import NODE_IF, NODE_GT, POSITION_LONG, POSITION_FLAT
+
+    ret_node = FEATURE_TERMINALS["return_1"]
+    ret_tree = TreeNode(node=ret_node, children=[], feature_name="return_1")
+    gt_tree = TreeNode(node=NODE_GT, children=[ret_tree, ret_tree], feature_name=None)
+    if_tree = TreeNode(
+        node=NODE_IF,
+        children=[
+            gt_tree,
+            TreeNode(node=POSITION_LONG, children=[], feature_name=None),
+            TreeNode(node=POSITION_FLAT, children=[], feature_name=None),
+        ],
+        feature_name=None,
+    )
+    ind = Individual(root=if_tree)
+
+    fitness_fn = make_fitness_fn(
+        trending_ohlc, ctx, FitnessConfig(symbol="EURUSD", min_trades=1)
+    )
+    with caplog.at_level(logging.ERROR):
+        f = fitness_fn(ind)
+    assert f == float("-inf")
+    assert fitness_fn.error_stats["evaluate"] >= 1
+    assert "Error evaluando individuo" in caplog.text
+
+
+def test_fitness_no_error_for_valid_individual(trending_ohlc):
+    """Un individuo válido no incrementa los contadores."""
+    n = len(trending_ohlc)
+    ctx = EvalContext(features={"x": np.ones(n)}, n=n)
+
+    from gp.nodes import POSITION_LONG
+    tree = TreeNode(node=POSITION_LONG, children=[], feature_name=None)
+    ind = Individual(root=tree)
+
+    fitness_fn = make_fitness_fn(
+        trending_ohlc, ctx, FitnessConfig(symbol="EURUSD", min_trades=1)
+    )
+    fitness_fn(ind)
+    assert fitness_fn.error_stats["evaluate"] == 0
+    assert fitness_fn.error_stats["backtest"] == 0
+
 # ---------------------------------------------------------------------------
 # Tests del fitness completo
 # ---------------------------------------------------------------------------
@@ -210,7 +259,7 @@ def test_fitness_accepts_valid_individual(trending_ohlc):
 
     fitness_fn = make_fitness_fn(
         trending_ohlc, ctx,
-        FitnessConfig(symbol="EURUSD",min_trades=2, max_turnover_ratio=1.0)
+        FitnessConfig(symbol="EURUSD", min_trades=2, max_turnover_ratio=1.0)
     )
     f = fitness_fn(ind)
     assert f > float("-inf")

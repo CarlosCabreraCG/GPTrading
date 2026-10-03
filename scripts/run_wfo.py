@@ -28,7 +28,12 @@ from gp.evolution import EvolutionConfig
 from validation.folds import WFConfig, generate_folds
 from validation.walk_forward import run_walk_forward
 from config.settings import SUPPORTED_SYMBOLS, infer_symbol_from_path
+import logging
 
+logging.basicConfig(
+    level=logging.WARNING,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
 
 def main():
     parser = argparse.ArgumentParser(description="WFO sobre 5 años de datos.")
@@ -171,7 +176,8 @@ def main():
             print(f"  {k}: {v:.4f}")
         else:
             print(f"  {k}: {v}")
-
+    print(f"\nErrores de evaluación: {result.metrics_aggregated.get('errors_evaluate', 0)}")
+    print(f"Errores de backtest: {result.metrics_aggregated.get('errors_backtest', 0)}")
 
 if __name__ == "__main__":
     main()

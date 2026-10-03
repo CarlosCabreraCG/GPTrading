@@ -21,6 +21,8 @@ from typing import Optional
 
 import numpy as np
 import pandas as pd
+import logging
+import traceback
 
 from backtest.engine import BacktestConfig, run_backtest
 from config.settings import DEFAULT_COSTS, CostModel
@@ -29,6 +31,7 @@ from fitness.metrics import sharpe, sortino, turnover
 from gp.evaluator import EvalContext
 from gp.individual import Individual
 
+logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class FitnessConfig:
@@ -80,14 +83,28 @@ def make_fitness_fn(
     )
 
     n_rows = len(ohlc)
-
+    error_stats = {
+        "evaluate": 0,
+        "backtest": 0,
+        "first_evaluate_error": None,
+        "first_backtest_error": None,
+    }
+    
     def fitness_fn(ind: Individual) -> float:
         try:
             signals_array = ind.evaluate(ctx)
-        except Exception:
+        except Exception as e:
+            error_stats["evaluate"] += 1
+            if error_stats["first_evaluate_error"] is None:
+                error_stats["first_evaluate_error"] = traceback.format_exc()
+                logger.error(
+                    "Error evaluando individuo (se registrarán más fallos "
+                    "silenciosamente). Traceback:\n%s",
+                    error_stats["first_evaluate_error"],
+                )
             return float("-inf")
-
-        # Convertir a Series con el índice del ohlc
+        
+        # Convertir a Series con el índice del ohlc (AQUÍ SE DEFINE signals)
         signals = pd.Series(signals_array, index=ohlc.index, name="signal")
 
         # Restricción: inactividad total
@@ -99,10 +116,18 @@ def make_fitness_fn(
         if flat_ratio > config.max_flat_ratio:
             return float("-inf")
 
-        # Backtest
+        # Backtest (Único y correcto bloque)
         try:
             result = run_backtest(ohlc, signals, backtest_config)
-        except Exception:
+        except Exception as e:
+            error_stats["backtest"] += 1
+            if error_stats["first_backtest_error"] is None:
+                error_stats["first_backtest_error"] = traceback.format_exc()
+                logger.error(
+                    "Error en backtest (se registrarán más fallos "
+                    "silenciosamente). Traceback:\n%s",
+                    error_stats["first_backtest_error"],
+                )
             return float("-inf")
 
         # Mínimo de trades
@@ -130,5 +155,6 @@ def make_fitness_fn(
 
         fitness = perf - p_complexity - p_turnover - p_inactivity
         return float(fitness)
-
+        
+    fitness_fn.error_stats = error_stats
     return fitness_fn

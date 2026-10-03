@@ -43,7 +43,7 @@ class FoldResult:
     oos_return: float
     oos_n_trades: int
     oos_max_dd: float
-
+    fitness_fn: object = None
 
 @dataclass
 class WalkForwardResult:
@@ -189,6 +189,7 @@ def run_walk_forward(
                 oos_return=oos_return,
                 oos_n_trades=oos_result.n_trades,
                 oos_max_dd=oos_dd,
+                fitness_fn=fitness_fn
             )
         )
 
@@ -217,6 +218,17 @@ def run_walk_forward(
 
     # Métricas agregadas
     metrics_aggregated = _aggregate_metrics(fold_results, equity_stitched)
+
+    # Acumular error_stats de todos los folds
+    total_errors = {"evaluate": 0, "backtest": 0}
+    for fr in fold_results:
+        stats = getattr(fr.fitness_fn, "error_stats", None)
+        if stats:
+            total_errors["evaluate"] += stats["evaluate"]
+            total_errors["backtest"] += stats["backtest"]
+
+    metrics_aggregated["errors_evaluate"] = total_errors["evaluate"]
+    metrics_aggregated["errors_backtest"] = total_errors["backtest"]
 
     return WalkForwardResult(
         symbol=symbol,
