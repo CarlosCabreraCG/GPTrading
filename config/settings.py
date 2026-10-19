@@ -23,7 +23,7 @@ PROJECT_ROOT: Final[Path] = Path(__file__).resolve().parent.parent
 DATA_DIR: Final[Path] = PROJECT_ROOT / "data_files"
 EXPERIMENTS_DIR: Final[Path] = PROJECT_ROOT / "experiments_output"
 
-DEFAULT_CSV: Final[Path] = DATA_DIR / "EURUSD_X_15m_5y.csv"
+DEFAULT_CSV: Final[Path] = DATA_DIR / "eurusd_15m_5y.csv"
 
 # ---------------------------------------------------------------------------
 # Protección numérica para operadores GP
@@ -173,7 +173,7 @@ def infer_symbol_from_path(csv_path: str | Path) -> str:
     """
     Infiere el símbolo desde el nombre del archivo.
 
-    Ejemplo: 'XAUUSD_X_15m_5y.csv' -> 'XAUUSD'.
+    Ejemplo: 'XAUUSD_15m_5y.csv' -> 'XAUUSD'.
 
     Lanza ValueError si no se puede inferir o si el símbolo no está soportado.
     """

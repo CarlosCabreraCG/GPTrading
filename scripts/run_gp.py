@@ -2,7 +2,7 @@
 Script: corre GP sobre un dataset y devuelve el mejor individuo.
 
 Uso:
-    python -m scripts.run_gp --csv data_files/EURUSD_X_15m_60d.csv \
+    python -m scripts.run_gp --csv data_files/eurusd_15m_60d.csv \
         --population 50 --generations 15 --seed 42 \
         --output experiments_output/gp_run_001
 """

@@ -1,7 +1,7 @@
 import pandas as pd
 
 # 1. Ejemplo de datos como el tuyo
-data = pd.read_csv("data_files/EURUSD_X_15m_5y.csv")
+data = pd.read_csv("data_files/eurusd_15m_5y.csv")
 df = pd.DataFrame(data)
 
 # 2. Convertir la columna datetime a formato datetime de pandas

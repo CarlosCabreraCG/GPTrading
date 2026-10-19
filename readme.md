@@ -27,7 +27,7 @@ Flujo típico de trabajo
 1. Auditoría del backtester (opcional, pero recomendado antes de confiar en resultados)
 ```bash
 python -m scripts.audit_backtester \
-    --csv data_files/EURUSD_X_15m_5y.csv \
+    --csv data_files/eurusd_15m_5y.csv \
     --output experiments_output/audit \
     --n-bars 2000 \
     --period 100
@@ -48,7 +48,7 @@ Genera bar_log.csv (estado por vela) y trades_audit.csv (auditoría por trade).
 2. Walk-Forward Optimization completo
 ```bash
 python -m scripts.run_wfo \
-    --csv data_files/EURUSD_X_15m_5y.csv \
+    --csv data_files/eurusd_15m_5y.csv \
     --output experiments_output/wfo_5y_baseline \
     --is-months 12 \
     --oos-months 3 \
@@ -72,7 +72,7 @@ Tiempo estimado: ~15 min con --population 20 --generations 5, ~1 hora con los de
 3. Dry-run de WFO (solo ver folds, sin correr GP)
 ```bash
 python -m scripts.run_wfo 
-    --csv data_files/EURUSD_X_15m_5y.csv 
+    --csv data_files/eurusd_15m_5y.csv 
     --output experiments_output/wfo_dryrun 
     --is-months 12 
     --oos-months 3 
@@ -84,7 +84,7 @@ que la configuración de WFO es coherente antes de gastar horas.
 4. GP simple (sin WFO)
 ```bash
 python -m scripts.run_gp 
-    --csv data_files/EURUSD_X_15m_5y.csv 
+    --csv data_files/eurusd_15m_5y.csv 
     --output experiments_output/gp_run_001 
     --population 50 
     --generations 15 
@@ -97,7 +97,7 @@ exploración rápida. No usar para validación seria.
 ```bash
 python -m scripts.evaluate_strategy \
     --individual experiments_output/gp_run_001/best_individual.json \
-    --csvs data_files/GBPUSD_X_15m_5y.csv data_files/USDJPY_X_15m_5y.csv
+    --csvs data_files/gbpusd_15m_5y.csv data_files/eurusd_15m_5y.csv
 ```
 Evalúa un individuo ya entrenado sobre otros pares, sin reajustar.
 Si funciona sin reoptimizar, hay evidencia de generalización estructural.
@@ -118,7 +118,7 @@ Correr todos menos
 6. Pipeline completo (orquestador)
 ```bash
 python main.py 
-    --csv data_files/EURUSD_X_15m_5y.csv 
+    --csv data_files/eurusd_15m_5y.csv 
     --output-dir experiments_output 
     --population 30 
     --generations 8 

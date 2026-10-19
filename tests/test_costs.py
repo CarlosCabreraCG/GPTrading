@@ -25,7 +25,7 @@ from config.settings import (
 
 
 def test_supported_symbols_has_expected():
-    expected = {"EURUSD", "XAUUSD", "XAGUSD", "WTI", "BRENT", "USA500", "USATECH"}
+    expected = {"EURUSD", "GBPUSD", "XAUUSD", "XAGUSD", "WTI", "BRENT", "USA500", "USATECH"}
     assert set(SUPPORTED_SYMBOLS) == expected
 
 
@@ -53,14 +53,14 @@ def test_get_costs_raises_for_unknown():
 
 
 def test_infer_symbol_from_path_valid():
-    assert infer_symbol_from_path("XAUUSD_X_15m_5y.csv") == "XAUUSD"
-    assert infer_symbol_from_path("EURUSD_X_15m_5y.csv") == "EURUSD"
-    assert infer_symbol_from_path("/path/to/WTI_X_15m_5y.csv") == "WTI"
+    assert infer_symbol_from_path("xauusd_15m_5y.csv") == "XAUUSD"
+    assert infer_symbol_from_path("eurusd_15m_5y.csv") == "EURUSD"
+    assert infer_symbol_from_path("/path/to/wti_15m_5y.csv") == "WTI"
 
 
 def test_infer_symbol_from_path_invalid():
     with pytest.raises(ValueError, match="no está en SUPPORTED_SYMBOLS"):
-        infer_symbol_from_path("UNKNOWN_X_15m_5y.csv")
+        infer_symbol_from_path("UNKNOWN_15m_5y.csv")
 
 
 def test_backtest_config_resolves_costs_from_symbol():

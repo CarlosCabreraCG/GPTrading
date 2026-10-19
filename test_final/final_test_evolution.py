@@ -6,7 +6,7 @@ from gp.evaluator import EvalContext
 from gp.evolution import EvolutionConfig, evolve
 from fitness.objective import FitnessConfig, make_fitness_fn
 
-df, _ = load_and_clean("data_files/EURUSD_X_15m_60d.csv")
+df, _ = load_and_clean("data_files/eurusd_15m_60d.csv")
 feats = compute_features(df)
 df_aligned, feats_aligned = drop_warmup_rows(df, feats)
 
