@@ -7,7 +7,7 @@ from gp.evolution import EvolutionConfig, evolve
 from features.engine import compute_features, drop_warmup_rows
 from gp.evaluator import EvalContext
 
-df, _ = load_and_clean("data_files/EURUSD_X_15m_5y.csv")
+df, _ = load_and_clean("data_files/eurusd_15m_5y.csv")
 dev, _ = split_development_final(df, SplitConfig(final_test_ratio=0.10, save_final_test=False))
 
 wf_config = WFConfig(is_size=12*2100, oos_size=3*2100, max_timestamp=dev.index[-1])

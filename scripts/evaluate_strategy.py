@@ -3,7 +3,7 @@ Script: evalúa un individuo guardado sobre otros datos (cross-pair, cross-TF).
 
 Uso:
     python -m scripts.evaluate_strategy --individual experiments_output/gp_run_001/best_individual.json \
-        --csvs data_files/GBPUSD_X_15m_60d.csv data_files/USDJPY_X_15m_60d.csv
+        --csvs data_files/gbpusd_15m_60d.csv data_files/eurusd_15m_60d.csv
 """
 
 from __future__ import annotations

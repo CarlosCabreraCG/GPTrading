@@ -23,22 +23,22 @@ from pathlib import Path
 EXPERIMENTS = [
     {
         "name": "gold",
-        "csv": "data_files/XAUUSD_X_15m_5y.csv",
+        "csv": "data_files/xauusd_15m_5y.csv",
         "output": "experiments_output/wfo_gold_v2",
     },
     {
         "name": "eurusd_15m",
-        "csv": "data_files/EURUSD_X_15m_5y.csv",
+        "csv": "data_files/eurusd_15m_5y.csv",
         "output": "experiments_output/wfo_eurusd_15m_v2",
     },
     {
         "name": "gbpusd_15m",
-        "csv": "data_files/GBPUSD_X_15m_5y.csv",
+        "csv": "data_files/gbpusd_15m_5y.csv",
         "output": "experiments_output/wfo_gbpusd_15m_v2",
     },
     {
         "name": "eurusd_h4",
-        "csv": "data_files/EURUSD_X_H4_5y.csv",
+        "csv": "data_files/eurusd_H4_5y.csv",
         "output": "experiments_output/wfo_eurusd_h4_v2",
     },
 ]

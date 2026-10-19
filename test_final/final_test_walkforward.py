@@ -7,7 +7,7 @@ from gp.evolution import EvolutionConfig
 from validation.folds import WFConfig, generate_folds
 from validation.walk_forward import run_walk_forward
 
-df, _ = load_and_clean("data_files/EURUSD_X_15m_60d.csv")
+df, _ = load_and_clean("data_files/eurusd_15m_60d.csv")
 
 # Con 5648 velas, ¿cuántos folds caben?
 wf_config = WFConfig(

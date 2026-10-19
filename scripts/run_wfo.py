@@ -8,7 +8,7 @@ Modos:
 - --dry-run: solo genera y reporta folds, no corre GP.
 
 Uso:
-    python -m scripts.run_wfo --csv data_files/EURUSD_X_15m_5y.csv \
+    python -m scripts.run_wfo --csv data_files/eurusd_15m_5y.csv \
         --output experiments_output/wfo_5y_baseline \
         --dry-run
 """

@@ -4,7 +4,7 @@ Orquestador mínimo.
 Ejecuta el pipeline completo con una configuración por defecto.
 
 Uso:
-    python main.py --csv data_files/EURUSD_X_15m_60d.csv
+    python main.py --csv data_files/eurusd_15m_60d.csv
 """
 
 from __future__ import annotations

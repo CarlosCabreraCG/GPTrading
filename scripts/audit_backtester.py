@@ -10,7 +10,7 @@ y verifica manualmente:
 
 Uso:
     python -m scripts.audit_backtester \
-        --csv data_files/EURUSD_X_15m_5y.csv \
+        --csv data_files/eurusd_15m_5y.csv \
         --output experiments_output/audit \
         --n-bars 2000
 """
