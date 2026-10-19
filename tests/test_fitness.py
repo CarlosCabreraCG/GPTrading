@@ -303,3 +303,45 @@ def test_fitness_handles_evaluation_error():
 
     fn = make_fitness_fn(ohlc, ctx, FitnessConfig(symbol="EURUSD",min_trades=1))
     assert fn(ind) == float("-inf")
+
+
+def test_fitness_rejects_high_turnover(trending_ohlc):
+    """Un individuo que cambia de posición cada vela debe ser rechazado."""
+    n = len(trending_ohlc)
+    # Señal que alterna LONG/FLAT cada vela
+    alt = np.array([1 if i % 2 == 0 else 0 for i in range(n)], dtype=np.int8)
+    signals = pd.Series(alt, index=trending_ohlc.index, name="signal")
+
+    # Construir individuo que devuelve esa señal: usamos feature fake
+    from gp.evaluator import EvalContext, TreeNode
+    from gp.individual import Individual
+    from gp.nodes import Node, NODE_IF, NODE_GT, POSITION_LONG, POSITION_FLAT
+    from gp.types import GPType
+    from gp.nodes import NODE_NEG
+
+    ctx = EvalContext(features={"alt": alt.astype(float)}, n=n)
+    alt_node = Node(name="alt", return_type=GPType.REAL, arg_types=(), func=None)
+    alt_tree = TreeNode(node=alt_node, children=[], feature_name="alt")
+    neg_tree = TreeNode(node=NODE_NEG, children=[alt_tree], feature_name=None)
+    gt_tree = TreeNode(node=NODE_GT, children=[alt_tree, neg_tree], feature_name=None)
+    if_tree = TreeNode(
+        node=NODE_IF,
+        children=[
+            gt_tree,
+            TreeNode(node=POSITION_LONG, children=[], feature_name=None),
+            TreeNode(node=POSITION_FLAT, children=[], feature_name=None),
+        ],
+        feature_name=None,
+    )
+    ind = Individual(root=if_tree)
+
+    cfg = FitnessConfig(
+        symbol="EURUSD",
+        min_trades=1,
+        max_turnover_ratio=0.15,   # estricto
+        max_flat_ratio=0.99,
+    )
+    fn = make_fitness_fn(trending_ohlc, ctx, cfg)
+    assert fn(ind) == float("-inf")
+
+    

@@ -43,14 +43,14 @@ class FitnessConfig:
     size: float = 1.0
 
     # Restricciones
-    min_trades: int = 5
-    max_turnover_ratio: float = 0.5   # transiciones / n_velas
-    max_flat_ratio: float = 0.98      # si está flat >98% del tiempo, penalizar
+    min_trades: int = 20
+    max_turnover_ratio: float = 0.15   # transiciones / n_velas
+    max_flat_ratio: float = 0.90      # si está flat >90% del tiempo, penalizar
 
     # Pesos de penalización
     complexity: ComplexityWeights = field(default_factory=ComplexityWeights)
-    turnover_penalty_weight: float = 0.02
-    inactivity_penalty_weight: float = 0.5
+    turnover_penalty_weight: float = 0.5
+    inactivity_penalty_weight: float = 0.1
 
     # Métrica principal
     primary_metric: str = "sharpe"    # "sharpe" o "sortino"
@@ -154,6 +154,12 @@ def make_fitness_fn(
         p_inactivity = config.inactivity_penalty_weight * flat_ratio
 
         fitness = perf - p_complexity - p_turnover - p_inactivity
+        fitness_fn.last_metrics = {
+            "n_trades": result.n_trades,
+            "turnover_ratio": turnover_ratio,
+            "flat_ratio": flat_ratio,
+            "sharpe": perf,
+        }
         return float(fitness)
         
     fitness_fn.error_stats = error_stats
