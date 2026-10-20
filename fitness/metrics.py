@@ -13,21 +13,28 @@ import pandas as pd
 from backtest.results import BacktestResult, compute_metrics
 
 
-def annualization_factor(index) -> float:
-    """Factor de anualización. Acepta DatetimeIndex o cualquier índice."""
-    if not isinstance(index, pd.DatetimeIndex):
-        # Fallback: asumir 15m (900s) como frecuencia por defecto
-        return float((365.25 * 24 * 3600) / 900.0)
+def annualization_factor(index, symbol: str) -> float:
+    """
+    Factor de anualización basado en barras reales por año del símbolo.
+    """
+    from config.settings import bars_per_year
+
     if len(index) < 3:
         return 1.0
-    deltas = index.to_series().diff().dropna().dt.total_seconds()
-    freq = float(deltas.median())
-    if freq <= 0:
-        return 1.0
-    return float((365.25 * 24 * 3600) / freq)
+
+    if not isinstance(index, pd.DatetimeIndex):
+        # Fallback conservador: asumir 15m
+        bar_seconds = 900.0
+    else:
+        deltas = index.to_series().diff().dropna().dt.total_seconds()
+        bar_seconds = float(deltas.median())
+        if bar_seconds <= 0:
+            return 1.0
+
+    return bars_per_year(symbol, bar_seconds)
 
 
-def sharpe(equity: pd.Series) -> float:
+def sharpe(equity: pd.Series, symbol: str) -> float:
     """Sharpe anualizado (rf=0)."""
     if len(equity) < 2:
         return 0.0
@@ -35,11 +42,11 @@ def sharpe(equity: pd.Series) -> float:
     std = returns.std()
     if std <= 0:
         return 0.0
-    ann = annualization_factor(equity.index)
+    ann = annualization_factor(equity.index, symbol)
     return float((returns.mean() / std) * np.sqrt(ann))
 
 
-def sortino(equity: pd.Series) -> float:
+def sortino(equity: pd.Series, symbol: str) -> float:
     """Sortino anualizado (solo downside deviation)."""
     if len(equity) < 2:
         return 0.0
@@ -47,7 +54,7 @@ def sortino(equity: pd.Series) -> float:
     downside = returns[returns < 0]
     if len(downside) < 2 or downside.std() <= 0:
         return 0.0
-    ann = annualization_factor(equity.index)
+    ann = annualization_factor(equity.index, symbol)
     return float((returns.mean() / downside.std()) * np.sqrt(ann))
 
 

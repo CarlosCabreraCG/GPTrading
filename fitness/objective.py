@@ -136,9 +136,9 @@ def make_fitness_fn(
 
         # Métrica principal
         if config.primary_metric == "sharpe":
-            perf = sharpe(result.equity)
+            perf = sharpe(result.equity, config.symbol)
         elif config.primary_metric == "sortino":
-            perf = sortino(result.equity)
+            perf = sortino(result.equity, config.symbol)
         else:
             raise ValueError(f"Métrica no soportada: {config.primary_metric}")
 
