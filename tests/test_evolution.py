@@ -304,3 +304,39 @@ def test_evolve_best_individual_is_valid():
     config = EvolutionConfig(population_size=15, n_generations=5, seed=7)
     result = evolve(fitness, config)
     result.best_individual.validate()
+
+def test_crossover_respects_max_depth():
+    from config.settings import GPLimits
+    limits = GPLimits(max_depth=4, max_nodes=100, max_conditions=20,
+                      max_indicators=20, max_nesting=2)
+    rng = np.random.default_rng(42)
+    for _ in range(30):
+        p1 = random_individual(limits=limits, rng=rng)
+        p2 = random_individual(limits=limits, rng=rng)
+        c1, c2 = crossover(p1, p2, limits=limits, rng=rng)
+        assert c1.depth <= limits.max_depth, f"child1 depth {c1.depth}"
+        assert c2.depth <= limits.max_depth, f"child2 depth {c2.depth}"
+
+
+def test_mutation_respects_max_depth():
+    from config.settings import GPLimits
+    limits = GPLimits(max_depth=4, max_nodes=100, max_conditions=20,
+                      max_indicators=20, max_nesting=2)
+    rng = np.random.default_rng(1)
+    for _ in range(30):
+        ind = random_individual(limits=limits, rng=rng)
+        m = mutate(ind, limits=limits, rng=rng, mutation_rate=1.0)
+        assert m.depth <= limits.max_depth, f"mutated depth {m.depth}"
+
+
+def test_crossover_respects_max_conditions():
+    from config.settings import GPLimits
+    limits = GPLimits(max_depth=8, max_nodes=200, max_conditions=3,
+                      max_indicators=20, max_nesting=3)
+    rng = np.random.default_rng(7)
+    for _ in range(30):
+        p1 = random_individual(limits=limits, rng=rng)
+        p2 = random_individual(limits=limits, rng=rng)
+        c1, c2 = crossover(p1, p2, limits=limits, rng=rng)
+        assert c1.n_conditions() <= limits.max_conditions
+        assert c2.n_conditions() <= limits.max_conditions

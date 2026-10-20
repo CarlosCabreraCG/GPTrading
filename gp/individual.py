@@ -167,20 +167,59 @@ def random_individual(
     rng: Optional[np.random.Generator] = None,
 ) -> Individual:
     """
-    Construye un individuo aleatorio.
+    Construye un individuo aleatorio que respeta todos los límites.
 
-    La raíz es siempre de tipo POSITION (es la salida del sistema).
+    La raíz es siempre de tipo POSITION.
+    Si el árbol generado incumple algún límite, se vuelve a generar.
     """
     if rng is None:
         rng = np.random.default_rng()
 
-    root = _random_tree_recursive(
-        grammar=grammar,
-        target_type=GPType.POSITION,
-        remaining_depth=limits.max_depth,
-        rng=rng,
+    max_attempts = 1000
+
+    for _ in range(max_attempts):
+        root = _random_tree_recursive(
+            grammar=grammar,
+            target_type=GPType.POSITION,
+            remaining_depth=limits.max_depth,
+            rng=rng,
+        )
+
+        ind = Individual(root=root)
+
+        # Comprobar todos los límites estructurales.
+        if (
+            ind.size > limits.max_nodes
+            or ind.depth > limits.max_depth
+            or ind.n_conditions() > limits.max_conditions
+            or ind.n_features() > limits.max_indicators
+            or _max_if_nesting(ind.root) > limits.max_nesting
+        ):
+            continue
+
+        # Validar la estructura y los tipos.
+        try:
+            ind.validate()
+        except ValueError:
+            continue
+
+        return ind
+
+    raise RuntimeError(
+        f"No se pudo generar un individuo válido después de "
+        f"{max_attempts} intentos. Revisa los límites y la gramática."
     )
 
-    ind = Individual(root=root)
-    ind.validate()
-    return ind
+def _max_if_nesting(tree) -> int:
+    """Profundidad máxima de nodos IF anidados."""
+    is_if = tree.node.name == "IF"
+
+    if not tree.children:
+        return 1 if is_if else 0
+
+    child_max = max(
+        (_max_if_nesting(child) for child in tree.children),
+        default=0,
+    )
+
+    return 1 + child_max if is_if else child_max
