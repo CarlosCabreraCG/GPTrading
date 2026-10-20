@@ -48,12 +48,16 @@ def main():
     parser.add_argument("--is-ratio", type=float, default=0.8)
     parser.add_argument("--min-is-size", type=int, default=20000)
     parser.add_argument("--min-oos-size", type=int, default=5000)
-    parser.add_argument("--min-trades", type=int, default=5)
+    parser.add_argument("--min-trades", type=int, default=20)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--dry-run", action="store_true",
                         help="Solo generar folds y reportar, sin correr GP.")
     parser.add_argument("--is-months", type=int, default=12)
     parser.add_argument("--oos-months", type=int, default=3)
+    parser.add_argument("--max-turnover-ratio", type=float, default=0.15)
+    parser.add_argument("--max-flat-ratio", type=float, default=0.90)
+    parser.add_argument("--turnover-penalty", type=float, default=0.5)
+    parser.add_argument("--inactivity-penalty", type=float, default=0.1)
     args = parser.parse_args()
 
     if args.symbol is None:
@@ -126,7 +130,12 @@ def main():
     )
     fitness_config = FitnessConfig(
         symbol=symbol,
-        min_trades=args.min_trades)
+        min_trades=args.min_trades,
+        max_turnover_ratio=args.max_turnover_ratio,
+        max_flat_ratio=args.max_flat_ratio,
+        turnover_penalty_weight=args.turnover_penalty,
+        inactivity_penalty_weight=args.inactivity_penalty,
+    )
 
     t0 = time.time()
     result = run_walk_forward(

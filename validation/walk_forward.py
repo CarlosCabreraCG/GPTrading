@@ -76,8 +76,8 @@ def _build_context(ohlc: pd.DataFrame) -> tuple[EvalContext, pd.DataFrame]:
     return ctx, df_aligned
 
 
-def _oos_sharpe(equity: pd.Series) -> float:
-    return sharpe(equity)
+def _oos_sharpe(equity: pd.Series, symbol: str) -> float:
+    return sharpe(equity, symbol)
 
 
 # ---------------------------------------------------------------------------
@@ -170,7 +170,7 @@ def run_walk_forward(
             df_oos, signals_oos,backtest_config
         )
 
-        oos_sharpe = _oos_sharpe(oos_result.equity)
+        oos_sharpe = _oos_sharpe(oos_result.equity, symbol)
         oos_return = float(
             (oos_result.equity.iloc[-1] / current_capital) - 1.0
         )
@@ -217,7 +217,7 @@ def run_walk_forward(
         equity_stitched = None
 
     # Métricas agregadas
-    metrics_aggregated = _aggregate_metrics(fold_results, equity_stitched)
+    metrics_aggregated = _aggregate_metrics(fold_results, equity_stitched, symbol)
 
     # Acumular error_stats de todos los folds
     total_errors = {"evaluate": 0, "backtest": 0}
@@ -241,6 +241,7 @@ def run_walk_forward(
 def _aggregate_metrics(
     fold_results: list[FoldResult],
     equity_stitched: pd.Series | None,
+    symbol: str = "XAUUSD"
 ) -> dict:
     """Calcula métricas agregadas del WFO."""
     if not fold_results:
@@ -273,7 +274,7 @@ def _aggregate_metrics(
         out["stitched_total_return"] = float(
             (equity_stitched.iloc[-1] / equity_stitched.iloc[0]) - 1.0
         )
-        out["stitched_sharpe"] = sharpe(equity_stitched)
+        out["stitched_sharpe"] = sharpe(equity_stitched, symbol)
         out["stitched_max_dd"] = float(
             (equity_stitched / equity_stitched.cummax() - 1.0).min()
         )

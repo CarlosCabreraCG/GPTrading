@@ -246,3 +246,29 @@ class DataValidation:
 
 
 DEFAULT_DATA_VALIDATION: Final[DataValidation] = DataValidation()
+
+#: Horas de trading por semana por símbolo (aproximado).
+#: Forex: 24/5 = 120h. Oro: 23/5 = 115h. Índices: 6.5h/día * 5 = 32.5h.
+TRADING_HOURS_PER_WEEK: Final[dict[str, float]] = {
+    "EURUSD": 120.0,
+    "GBPUSD": 120.0,
+    "XAUUSD": 115.0,
+    "XAGUSD": 115.0,
+    "WTI": 115.0,
+    "BRENT": 115.0,
+    "USA500": 32.5,
+    "USATECH": 32.5,
+}
+
+def bars_per_year(symbol: str, bar_seconds: float) -> float:
+    """
+    Barras reales por año para un símbolo y una duración de barra en segundos.
+    """
+    if symbol not in TRADING_HOURS_PER_WEEK:
+        raise KeyError(
+            f"Símbolo '{symbol}' sin TRADING_HOURS_PER_WEEK. "
+            f"Añádelo a config/settings.py."
+        )
+    hours_per_week = TRADING_HOURS_PER_WEEK[symbol]
+    bars_per_week = (hours_per_week * 3600) / bar_seconds
+    return bars_per_week * 52.0

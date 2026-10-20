@@ -92,7 +92,7 @@ def evaluate_on_other_data(
     result = run_backtest(df_aligned, signals, bt_config)
 
     total_ret = float((result.equity.iloc[-1] / initial_capital) - 1.0)
-    sh = sharpe(result.equity)
+    sh = sharpe(result.equity, symbol)
     dd = float((result.equity / result.equity.cummax() - 1.0).min())
 
     return RobustnessResult(

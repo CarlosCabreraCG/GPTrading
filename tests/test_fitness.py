@@ -89,14 +89,14 @@ def trivial_ctx() -> EvalContext:
 def test_sharpe_positive_for_growing_equity():
     eq = pd.Series(np.linspace(10000, 11000, 100),
                    index=pd.date_range("2024-01-01", periods=100, freq="15min", tz="UTC"))
-    s = sharpe(eq)
+    s = sharpe(eq, symbol="XAUUSD")
     assert s > 0
 
 
 def test_sharpe_zero_for_flat_equity():
     eq = pd.Series(np.full(100, 10000.0),
                    index=pd.date_range("2024-01-01", periods=100, freq="15min", tz="UTC"))
-    assert sharpe(eq) == 0.0
+    assert sharpe(eq, symbol="XAUUSD") == 0.0
 
 
 def test_max_drawdown_negative_or_zero():
@@ -117,7 +117,7 @@ def test_calmar_positive_for_growing_equity():
 def test_sortino_zero_when_no_downside():
     eq = pd.Series([10000, 10100, 10200, 10300],
                    index=pd.date_range("2024-01-01", periods=4, freq="15min", tz="UTC"))
-    s = sortino(eq)
+    s = sortino(eq, symbol="XAUUSD")
     # Sin downside, sortino = 0 por nuestra definición (evita inf)
     assert s == 0.0
 
@@ -303,3 +303,66 @@ def test_fitness_handles_evaluation_error():
 
     fn = make_fitness_fn(ohlc, ctx, FitnessConfig(symbol="EURUSD",min_trades=1))
     assert fn(ind) == float("-inf")
+
+
+def test_fitness_rejects_high_turnover(trending_ohlc):
+    """Un individuo que cambia de posición cada vela debe ser rechazado."""
+    n = len(trending_ohlc)
+    # Señal que alterna LONG/FLAT cada vela
+    alt = np.array([1 if i % 2 == 0 else 0 for i in range(n)], dtype=np.int8)
+    signals = pd.Series(alt, index=trending_ohlc.index, name="signal")
+
+    # Construir individuo que devuelve esa señal: usamos feature fake
+    from gp.evaluator import EvalContext, TreeNode
+    from gp.individual import Individual
+    from gp.nodes import Node, NODE_IF, NODE_GT, POSITION_LONG, POSITION_FLAT
+    from gp.types import GPType
+    from gp.nodes import NODE_NEG
+
+    ctx = EvalContext(features={"alt": alt.astype(float)}, n=n)
+    alt_node = Node(name="alt", return_type=GPType.REAL, arg_types=(), func=None)
+    alt_tree = TreeNode(node=alt_node, children=[], feature_name="alt")
+    neg_tree = TreeNode(node=NODE_NEG, children=[alt_tree], feature_name=None)
+    gt_tree = TreeNode(node=NODE_GT, children=[alt_tree, neg_tree], feature_name=None)
+    if_tree = TreeNode(
+        node=NODE_IF,
+        children=[
+            gt_tree,
+            TreeNode(node=POSITION_LONG, children=[], feature_name=None),
+            TreeNode(node=POSITION_FLAT, children=[], feature_name=None),
+        ],
+        feature_name=None,
+    )
+    ind = Individual(root=if_tree)
+
+    cfg = FitnessConfig(
+        symbol="EURUSD",
+        min_trades=1,
+        max_turnover_ratio=0.15,   # estricto
+        max_flat_ratio=0.99,
+    )
+    fn = make_fitness_fn(trending_ohlc, ctx, cfg)
+    assert fn(ind) == float("-inf")
+
+def test_bars_per_year_forex():
+    from config.settings import bars_per_year
+    # 15m en forex: 120h/sem * 3600 / 900 = 480 barras/sem * 52 = 24,960
+    assert bars_per_year("EURUSD", 900.0) == pytest.approx(24_960.0)
+
+
+def test_bars_per_year_gold():
+    from config.settings import bars_per_year
+    # 15m en oro: 115h/sem * 3600 / 900 = 460 * 52 = 23,920
+    assert bars_per_year("XAUUSD", 900.0) == pytest.approx(23_920.0)
+
+
+def test_sharpe_uses_symbol_annualization():
+    import pandas as pd
+    import numpy as np
+    from fitness.metrics import sharpe
+    idx = pd.date_range("2024-01-01", periods=1000, freq="15min", tz="UTC")
+    eq = pd.Series(np.linspace(10000, 10100, 1000), index=idx)
+    # Con símbolo y sin símbolo debe diferir
+    s_eurusd = sharpe(eq, "EURUSD")
+    s_gold = sharpe(eq, "XAUUSD")
+    assert s_eurusd != s_gold
