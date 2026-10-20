@@ -28,6 +28,7 @@ from backtest.engine import BacktestConfig, run_backtest
 from config.settings import DEFAULT_COSTS, CostModel
 from fitness.complexity import ComplexityWeights, complexity_penalty
 from fitness.metrics import sharpe, sortino, turnover
+from fitness.metrics import compute_metrics as compute_backtest_metrics
 from gp.evaluator import EvalContext
 from gp.individual import Individual
 
@@ -133,17 +134,17 @@ def make_fitness_fn(
         # Mínimo de trades
         if result.n_trades < config.min_trades:
             return float("-inf")
-
+        metrics = compute_backtest_metrics(result, config.symbol)
         # Métrica principal
         if config.primary_metric == "sharpe":
-            perf = sharpe(result.equity, config.symbol)
+            perf = metrics["sharpe"] 
         elif config.primary_metric == "sortino":
-            perf = sortino(result.equity, config.symbol)
+            perf = metrics["sortino"]
         else:
             raise ValueError(f"Métrica no soportada: {config.primary_metric}")
 
         # Turnover
-        to = turnover(result.position)
+        to = metrics["turnover"]
         turnover_ratio = to / n_rows
         if turnover_ratio > config.max_turnover_ratio:
             return float("-inf")
