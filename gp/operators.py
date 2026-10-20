@@ -115,7 +115,7 @@ def crossover(
         child2 = Individual(root=child2_root)
 
         # Verificar límites
-        if child1.size > limits.max_nodes or child2.size > limits.max_nodes:
+        if _violates_limits(child1, limits) or _violates_limits(child2, limits):
             continue
 
         try:
@@ -176,7 +176,7 @@ def mutate(
         new_root = _replace_subtree(individual.root, target_sub, new_sub)
         new_ind = Individual(root=new_root)
 
-        if new_ind.size > limits.max_nodes:
+        if _violates_limits(new_ind, limits):
             continue
 
         try:
@@ -187,3 +187,29 @@ def mutate(
         return new_ind
 
     return copy.deepcopy(individual)
+
+def _violates_limits(ind: Individual, limits: GPLimits) -> bool:
+    """Devuelve True si el individuo viola algún límite de GPLimits."""
+    if ind.size > limits.max_nodes:
+        return True
+    if ind.depth > limits.max_depth:
+        return True
+    if ind.n_conditions() > limits.max_conditions:
+        return True
+    if ind.n_features() > limits.max_indicators:
+        return True
+    # max_nesting: profundidad máxima de nodos IF anidados
+    if _max_if_nesting(ind.root) > limits.max_nesting:
+        return True
+    return False
+
+
+def _max_if_nesting(tree) -> int:
+    """Profundidad máxima de IFs anidados (un IF dentro de otro IF cuenta)."""
+    is_if = (tree.node.name == "IF")
+    if not tree.children:
+        return 1 if is_if else 0
+    child_max = max((_max_if_nesting(c) for c in tree.children), default=0)
+    if is_if:
+        return 1 + child_max
+    return child_max
