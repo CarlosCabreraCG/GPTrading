@@ -251,6 +251,7 @@ def test_aggregate_metrics_empty():
 
 def test_aggregate_metrics_pct_positive():
     class FakeFold:
+        is_sharpe = 0.1
         oos_return = 0.01
         oos_sharpe = 1.0
         oos_n_trades = 5
@@ -295,3 +296,24 @@ def test_wfo_uses_different_seed_per_fold(synthetic_ohlc, monkeypatch):
     assert captured_seeds[0] == 1000
     # La segunda debe ser 1000 + 1 = 1001
     assert captured_seeds[1] == 1001
+
+def test_wfo_reports_degradation(synthetic_ohlc):
+    wf_config = WFConfig(is_size=500, oos_size=200,
+                         min_is_size=400, min_oos_size=150)
+    evo_config = EvolutionConfig(population_size=20, n_generations=2, seed=42)
+    fitness_config = FitnessConfig(symbol="EURUSD", min_trades=1, max_turnover_ratio=1.0)
+
+    result = run_walk_forward(
+        synthetic_ohlc, wf_config, evo_config, fitness_config,
+        symbol="EURUSD",
+    )
+
+    m = result.metrics_aggregated
+    assert "mean_is_sharpe" in m
+    assert "mean_degradation" in m
+    assert "median_degradation" in m
+    assert "pct_folds_degraded" in m
+
+    for fr in result.fold_results:
+        assert hasattr(fr, "is_sharpe")
+        assert isinstance(fr.is_sharpe, float)

@@ -37,6 +37,7 @@ class FoldResult:
     fold: Fold
     best_individual: object      # Individual (evitamos import circular)
     best_fitness_is: float
+    is_sharpe: float 
     is_result: object            # BacktestResult
     oos_result: object           # BacktestResult
     oos_sharpe: float
@@ -160,6 +161,8 @@ def run_walk_forward(
             df_is, signals_is,backtest_config
         )
 
+        is_sharpe = sharpe(is_result.equity, symbol)
+
         # 5. Evaluar el MISMO individuo en OOS
         signals_oos = pd.Series(
             evo_result.best_individual.evaluate(ctx_oos),
@@ -183,6 +186,7 @@ def run_walk_forward(
                 fold=fold,
                 best_individual=evo_result.best_individual,
                 best_fitness_is=evo_result.best_fitness,
+                is_sharpe=is_sharpe,
                 is_result=is_result,
                 oos_result=oos_result,
                 oos_sharpe=oos_sharpe,
@@ -278,5 +282,18 @@ def _aggregate_metrics(
         out["stitched_max_dd"] = float(
             (equity_stitched / equity_stitched.cummax() - 1.0).min()
         )
+    is_sharpes = [fr.is_sharpe for fr in fold_results]
+    degradations = []
+    for fr in fold_results:
+        if abs(fr.is_sharpe) > 1e-9:  # evitar división por ~0
+            deg = (fr.is_sharpe - fr.oos_sharpe) / fr.is_sharpe
+            degradations.append(deg)
+
+    out.update({
+        "mean_is_sharpe": float(np.mean(is_sharpes)),
+        "mean_degradation": float(np.mean(degradations)) if degradations else 0.0,
+        "median_degradation": float(np.median(degradations)) if degradations else 0.0,
+        "pct_folds_degraded": float(np.mean([fr.oos_sharpe < fr.is_sharpe for fr in fold_results])),
+    })
 
     return out
