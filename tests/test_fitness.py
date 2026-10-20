@@ -13,9 +13,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from backtest.engine import BacktestConfig, run_backtest
-from backtest.results import BacktestResult
-from config.settings import CostModel
+from backtest.engine import run_backtest
 from fitness.complexity import ComplexityWeights, complexity_penalty
 from fitness.metrics import (
     annualization_factor,
@@ -33,7 +31,7 @@ from gp.individual import Individual, random_individual
 from gp.nodes import POSITION_FLAT, POSITION_LONG, POSITION_SHORT
 from gp.evaluator import TreeNode
 from strategy.signal import Signal
-
+from tests.test_backtester import simple_ohlc
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -85,6 +83,16 @@ def trivial_ctx() -> EvalContext:
 # ---------------------------------------------------------------------------
 # Tests de métricas
 # ---------------------------------------------------------------------------
+
+def test_engine_metrics_are_finite(simple_ohlc):
+    signals = pd.Series([1, -1, 1, -1, 0, 0, 1, 0, -1, 0],
+                        index=simple_ohlc.index, name="signal")
+    result = run_backtest(simple_ohlc, signals)
+    metrics = result.metrics(symbol="EURUSD")
+    for k, v in metrics.items():
+        if k == "profit_factor":
+            continue  # puede ser inf
+        assert np.isfinite(v), f"Métrica {k} no finita: {v}"
 
 def test_sharpe_positive_for_growing_equity():
     eq = pd.Series(np.linspace(10000, 11000, 100),

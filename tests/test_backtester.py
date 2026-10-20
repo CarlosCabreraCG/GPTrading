@@ -179,8 +179,6 @@ def test_cost_size_scales_linearly(costs):
 from backtest.engine import BacktestConfig, run_backtest
 from backtest.execution import PortfolioState, apply_transition
 from backtest.position import Position
-from backtest.results import compute_metrics
-
 
 @pytest.fixture
 def simple_ohlc() -> pd.DataFrame:
@@ -374,16 +372,6 @@ def test_equity_final_equals_capital_plus_net(simple_ohlc):
     total_net = sum(t.net_pnl for t in result.trades)
     expected_equity = 10_000.0 + total_net
     assert result.equity.iloc[-1] == pytest.approx(expected_equity, abs=1e-9)
-
-def test_engine_metrics_are_finite(simple_ohlc):
-    signals = pd.Series([1, -1, 1, -1, 0, 0, 1, 0, -1, 0],
-                        index=simple_ohlc.index, name="signal")
-    result = run_backtest(simple_ohlc, signals)
-    metrics = result.metrics()
-    for k, v in metrics.items():
-        if k == "profit_factor":
-            continue  # puede ser inf
-        assert np.isfinite(v), f"Métrica {k} no finita: {v}"
 
 
 def test_engine_rejects_mismatched_lengths(simple_ohlc):

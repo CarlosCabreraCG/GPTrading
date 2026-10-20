@@ -10,8 +10,10 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from backtest.results import BacktestResult, compute_metrics
+from typing import TYPE_CHECKING
 
+if TYPE_CHECKING:
+    from backtest.results import BacktestResult
 
 def annualization_factor(index, symbol: str) -> float:
     """
@@ -107,3 +109,26 @@ def turnover(position: pd.Series) -> int:
 def compute_all(result: BacktestResult) -> dict[str, float]:
     """Atajo: devuelve el diccionario completo de métricas."""
     return compute_metrics(result)
+
+def compute_metrics(result, symbol: str) -> dict[str, float]:
+    """Métricas completas de un BacktestResult."""
+    equity = result.equity
+    trades = result.trades
+
+    gross_total = sum(t.gross_pnl for t in trades)
+    cost_total = sum(t.total_cost for t in trades)
+
+    return {
+        "sharpe": sharpe(equity, symbol),
+        "sortino": sortino(equity, symbol),
+        "max_drawdown": max_drawdown(equity),
+        "calmar": calmar(equity),
+        "profit_factor": profit_factor(trades),
+        "expectancy": expectancy(trades),
+        "total_return": float((equity.iloc[-1] / equity.iloc[0]) - 1.0),
+        "n_trades": len(trades),
+        "turnover": turnover(result.position),
+        "final_equity": float(equity.iloc[-1]),
+        "total_gross_pnl": float(gross_total),
+        "total_cost": float(cost_total),
+    }
