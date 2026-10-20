@@ -59,23 +59,44 @@ class WalkForwardResult:
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _build_context(ohlc: pd.DataFrame) -> tuple[EvalContext, pd.DataFrame]:
-    """
-    Calcula features y devuelve (EvalContext, df_aligned).
 
-    El EvalContext contiene los arrays de features alineados con df_aligned.
+def _build_context_and_split(
+    is_df: pd.DataFrame,
+    oos_df: pd.DataFrame,
+) -> tuple[EvalContext, pd.DataFrame, EvalContext, pd.DataFrame]:
     """
-    feats = compute_features(ohlc)
-    df_aligned, feats_aligned = drop_warmup_rows(ohlc, feats)
-    ctx = EvalContext(
-        features={
-            name: feats_aligned[name].to_numpy()
-            for name in feats_aligned.columns
-        },
-        n=len(feats_aligned),
+    Calcula features sobre IS+OOS juntos y recorta el warm-up inicial.
+
+    Devuelve (ctx_is, df_is_aligned, ctx_oos, df_oos_aligned).
+    """
+    combined = pd.concat([is_df, oos_df])
+    feats = compute_features(combined)
+
+    # Eliminar filas con NaN en TODAS las features (warm-up inicial)
+    valid_mask = feats.notna().all(axis=1)
+    combined_valid = combined.loc[valid_mask]
+    feats_valid = feats.loc[valid_mask]
+
+    # Recortar: IS = primeras len(is_df) válidas, OOS = el resto
+    n_is_original = len(is_df)
+    # Buscar el índice de corte: primera fila con timestamp > último de is_df
+    is_end_ts = is_df.index[-1]
+    n_is_valid = int((combined_valid.index <= is_end_ts).sum())
+
+    df_is_aligned = combined_valid.iloc[:n_is_valid]
+    feats_is_aligned = feats_valid.iloc[:n_is_valid]
+    df_oos_aligned = combined_valid.iloc[n_is_valid:]
+    feats_oos_aligned = feats_valid.iloc[n_is_valid:]
+
+    ctx_is = EvalContext(
+        features={n: feats_is_aligned[n].to_numpy() for n in feats_is_aligned.columns},
+        n=len(feats_is_aligned),
     )
-    return ctx, df_aligned
-
+    ctx_oos = EvalContext(
+        features={n: feats_oos_aligned[n].to_numpy() for n in feats_oos_aligned.columns},
+        n=len(feats_oos_aligned),
+    )
+    return ctx_is, df_is_aligned, ctx_oos, df_oos_aligned
 
 def _oos_sharpe(equity: pd.Series, symbol: str) -> float:
     return sharpe(equity, symbol)
@@ -127,8 +148,7 @@ def run_walk_forward(
             print(f"\n{fold}")
 
         # 1. Features IS y OOS por separado (evita look-ahead entre bloques)
-        ctx_is, df_is = _build_context(fold.is_df)
-        ctx_oos, df_oos = _build_context(fold.oos_df)
+        ctx_is, df_is, ctx_oos, df_oos = _build_context_and_split(fold.is_df, fold.oos_df)
 
         if len(df_is) < wf_config.min_is_size or len(df_oos) < wf_config.min_oos_size:
             if verbose:
