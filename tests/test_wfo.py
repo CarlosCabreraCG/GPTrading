@@ -317,3 +317,51 @@ def test_wfo_reports_degradation(synthetic_ohlc):
     for fr in result.fold_results:
         assert hasattr(fr, "is_sharpe")
         assert isinstance(fr.is_sharpe, float)
+
+def test_oos_has_no_warmup_loss(synthetic_ohlc):
+    """El OOS no debe perder velas por warm-up."""
+    wf_config = WFConfig(is_size=500, oos_size=200,
+                         min_is_size=400, min_oos_size=100)
+    evo_config = EvolutionConfig(population_size=5, n_generations=1, seed=42)
+    fitness_config = FitnessConfig(symbol="EURUSD", min_trades=1, max_turnover_ratio=1.0)
+
+    from validation import walk_forward as wf_module
+    from validation.folds import generate_folds
+
+    folds = generate_folds(synthetic_ohlc, wf_config)
+    fold = folds[0]
+
+    ctx_is, df_is, ctx_oos, df_oos = wf_module._build_context_and_split(
+        fold.is_df, fold.oos_df
+    )
+
+    # El OOS recortado debe tener ~len(fold.oos_df) velas
+    assert len(df_oos) == len(fold.oos_df), (
+        f"OOS perdió {len(fold.oos_df) - len(df_oos)} velas por warm-up"
+    )
+
+    # El IS recortado pierde algo por warm-up
+    assert len(df_is) <= len(fold.is_df)
+
+    # No debe haber solapamiento temporal entre IS y OOS recortados
+    if len(df_is) > 0 and len(df_oos) > 0:
+        assert df_is.index[-1] < df_oos.index[0]
+
+
+def test_is_oos_split_alignment(synthetic_ohlc):
+    """El corte entre IS y OOS recortados debe respetar el timestamp original."""
+    wf_config = WFConfig(is_size=500, oos_size=200,
+                         min_is_size=400, min_oos_size=100)
+    from validation import walk_forward as wf_module
+    from validation.folds import generate_folds
+
+    folds = generate_folds(synthetic_ohlc, wf_config)
+    fold = folds[0]
+    ctx_is, df_is, ctx_oos, df_oos = wf_module._build_context_and_split(
+        fold.is_df, fold.oos_df
+    )
+
+    # Todas las velas de df_is deben ser <= último timestamp de fold.is_df
+    assert (df_is.index <= fold.is_df.index[-1]).all()
+    # Todas las velas de df_oos deben ser > último timestamp de fold.is_df
+    assert (df_oos.index > fold.is_df.index[-1]).all()
