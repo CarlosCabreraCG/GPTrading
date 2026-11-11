@@ -32,7 +32,11 @@ class FinalTestConfig:
     """
     ratio: float = 0.10
     lock_file: Path | None = None
-
+    def __post_init__(self):
+        if not (0.0 < self.ratio < 0.5):
+            raise ValueError(
+                f"ratio debe estar en (0, 0.5), recibido {self.ratio}"
+            )
 
 def split_final_test(
     df: pd.DataFrame,

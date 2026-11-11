@@ -25,7 +25,11 @@ class SplitConfig:
     save_final_test: bool = True
     #: Ruta donde guardar el final_test si save_final_test=True.
     final_test_path: Path | None = None
-
+    def __post_init__(self):
+        if not (0.0 < self.final_test_ratio < 0.5):
+            raise ValueError(
+                f"final_test_ratio debe estar en (0, 0.5), "
+                f"recibido {self.final_test_ratio}")
 
 def split_development_final(
     df: pd.DataFrame,
@@ -58,7 +62,11 @@ def split_development_final(
     n = len(df)
     n_final = int(round(n * config.final_test_ratio))
     n_dev = n - n_final
-
+    if n_final < 1000:
+        raise ValueError(
+            f"Final test demasiado pequeño: {n_final} velas (mínimo 1000). "
+            f"Ratio {config.final_test_ratio} sobre {n} filas."
+        )
     development = df.iloc[:n_dev].copy()
     final_test = df.iloc[n_dev:].copy()
 

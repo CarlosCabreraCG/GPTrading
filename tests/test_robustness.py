@@ -146,3 +146,31 @@ def test_tracker_deflated_sharpe(tmp_path):
         )
     dsr = tracker.deflated_sharpe_ratio(observed_sharpe=2.0, n_observations=1000)
     assert 0.0 <= dsr <= 1.0
+
+def test_split_config_rejects_zero_ratio():
+    with pytest.raises(ValueError, match="final_test_ratio"):
+        SplitConfig(final_test_ratio=0.0)
+
+
+def test_split_config_rejects_negative_ratio():
+    with pytest.raises(ValueError, match="final_test_ratio"):
+        SplitConfig(final_test_ratio=-0.1)
+
+
+def test_split_config_rejects_too_large_ratio():
+    with pytest.raises(ValueError, match="final_test_ratio"):
+        SplitConfig(final_test_ratio=0.6)
+
+
+def test_split_rejects_small_final_test():
+    # Dataset de 5000 filas con ratio 0.10 -> 500 filas, < 1000. Debe fallar.
+    n = 5000
+    idx = pd.date_range("2024-01-01", periods=n, freq="15min", tz="UTC")
+    df = pd.DataFrame(
+        {"open": np.ones(n), "high": np.ones(n),
+         "low": np.ones(n), "close": np.ones(n)},
+        index=idx,
+    )
+    config = SplitConfig(final_test_ratio=0.10, save_final_test=False)
+    with pytest.raises(ValueError, match="final test demasiado pequeño|1000"):
+        split_development_final(df, config)
