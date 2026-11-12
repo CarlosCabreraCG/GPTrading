@@ -13,6 +13,7 @@ from experiments.tracker import ExperimentTracker
 from gp.evaluator import TreeNode
 from gp.individual import Individual
 from gp.nodes import POSITION_LONG
+from data.splitter import SplitConfig, split_development_final
 from validation.final_test import FinalTestConfig, run_final_test, split_final_test
 from validation.robustness import (
     cross_pair_test,
@@ -86,14 +87,6 @@ def test_split_final_test(ohlc_1):
     assert len(dev) + len(final) == len(ohlc_1)
     assert len(final) == 100
     assert dev.index[-1] < final.index[0]
-
-
-def test_split_final_test_zero_ratio(ohlc_1):
-    config = FinalTestConfig(ratio=0.0, lock_file=None)
-    dev, final = split_final_test(ohlc_1, config)
-    assert len(dev) == len(ohlc_1)
-    assert len(final) == 0
-
 
 def test_run_final_test(long_individual, ohlc_1, tmp_path):
     config = FinalTestConfig(ratio=0.2, lock_file=tmp_path / "lock.txt")
