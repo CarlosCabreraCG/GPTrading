@@ -296,13 +296,11 @@ def test_engine_no_lookahead_equity(simple_ohlc):
     signals_trunc = signals_full.iloc[: k + 1]
     result_trunc = run_backtest(ohlc_trunc, signals_trunc)
 
-    # El equity en t=0..k debe ser idéntico
+    # Comparar equity hasta t=k-1 (sin cierre forzado en ninguno de los dos)
     pd.testing.assert_series_equal(
-        result_full.equity.iloc[: k + 1],
-        result_trunc.equity,
-        check_names=False,
-        rtol=1e-12,
-        atol=1e-12,
+        result_full.equity.iloc[:k],
+        result_trunc.equity.iloc[:k],
+        check_names=False, rtol=1e-12, atol=1e-12,
     )
 
 
@@ -385,3 +383,30 @@ def test_engine_rejects_invalid_signals(simple_ohlc):
                         index=simple_ohlc.index, name="signal")
     with pytest.raises(ValueError, match="inválidas"):
         run_backtest(simple_ohlc, signals)
+
+def test_position_closed_at_end(simple_ohlc):
+    """Si hay posición abierta al final, debe cerrarse con coste."""
+    signals = pd.Series([1] * 10, index=simple_ohlc.index, name="signal")
+    result = run_backtest(
+        simple_ohlc, signals,
+        BacktestConfig(symbol="EURUSD", initial_capital=10_000.0)
+    )
+    # La posición al final debe ser FLAT
+    assert result.position.iloc[-1] == int(Signal.FLAT)
+    # Debe haber exactamente 1 trade cerrado (el forzado al final)
+    assert result.n_trades == 1
+
+
+def test_equity_final_accounts_for_forced_close(simple_ohlc):
+    """El equity final debe incluir el coste de cierre forzado."""
+    signals = pd.Series([1] * 10, index=simple_ohlc.index, name="signal")
+    result = run_backtest(
+        simple_ohlc, signals,
+        BacktestConfig(symbol="EURUSD", initial_capital=10_000.0)
+    )
+    # Equity final = capital + gross - 2*one_side_cost
+    one_side = 0.00010 / 2 + 0.00003  # EURUSD
+    # Entrada al open de t=1 (1.1010), cierre al close de t=9 (1.1095)
+    gross = 1.1095 - 1.1010
+    expected = 10_000.0 + gross - 2 * one_side
+    assert result.equity.iloc[-1] == pytest.approx(expected, abs=1e-9)
