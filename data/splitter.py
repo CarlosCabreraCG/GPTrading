@@ -46,13 +46,15 @@ def split_development_final(
     - df debe tener al menos 1000 filas para que el split tenga sentido.
     """
     if len(df) < 1000:
+        raise ValueError(f"Dataset demasiado pequeño: {len(df)} filas")
+    n = len(df)
+    n_final = int(round(n * config.final_test_ratio))
+    n_dev = n - n_final
+
+    if n_final < 1000:
         raise ValueError(
-            f"Dataset demasiado pequeño para split: {len(df)} filas"
-        )
-    if not (0.0 < config.final_test_ratio < 1.0):
-        raise ValueError(
-            f"final_test_ratio debe estar en (0, 1), "
-            f"recibido {config.final_test_ratio}"
+            f"Final test demasiado pequeño: {n_final} velas (mínimo 1000). "
+            f"Ratio {config.final_test_ratio} sobre {n} filas."
         )
 
     # Verificar orden cronológico
