@@ -130,6 +130,22 @@ def run_backtest(
 
         # 3. Guardar la señal de t para ejecutar en t+1
         pending_signal = Signal(int(signals.iloc[t]))
+    if not state.position.is_flat:
+        final_close = float(close_prices[-1])
+        final_time = timestamps[-1]
+        trade, _ = apply_transition(
+            state=state,
+            target_direction=Signal.FLAT,
+            execution_price=final_close,
+            execution_time=final_time,
+            costs=config.costs,
+            size=config.size,
+        )
+        if trade is not None:
+            trades.append(trade)
+        # Actualizar el equity de la última vela con el cierre forzado
+        equity_arr[-1] = state.equity(final_close)
+        position_arr[-1] = int(state.position.direction)
 
     equity_series = pd.Series(equity_arr, index=ohlc.index, name="equity")
     position_series = pd.Series(position_arr, index=ohlc.index, name="position")
