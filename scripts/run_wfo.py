@@ -162,8 +162,10 @@ def main():
         json.dump(result.metrics_aggregated, f, indent=2, default=str)
 
     tracker = ExperimentTracker(symbol=symbol,storage_path=Path(args.tracker))
+    n_trials = args.population * args.generations * len(result.fold_results)
     tracker.register(
         symbol=symbol,
+        n_trials=n_trials,
         config={
             "csv": args.csv,
             "is_ratio": args.is_ratio,
