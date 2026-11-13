@@ -30,10 +30,10 @@ class ExperimentRecord:
     experiment_id: str
     timestamp: str
     symbol: str
-    n_trials: int
-    config: dict
-    is_metrics: dict
-    oos_metrics: dict
+    n_trials: int = 1 
+    config: dict = field(default_factory=dict)
+    is_metrics: dict = field(default_factory=dict)
+    oos_metrics: dict = field(default_factory=dict)
     notes: str = ""
 
     def to_dict(self) -> dict:
