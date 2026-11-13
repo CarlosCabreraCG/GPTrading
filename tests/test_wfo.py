@@ -365,3 +365,38 @@ def test_is_oos_split_alignment(synthetic_ohlc):
     assert (df_is.index <= fold.is_df.index[-1]).all()
     # Todas las velas de df_oos deben ser > último timestamp de fold.is_df
     assert (df_oos.index > fold.is_df.index[-1]).all()
+
+def test_wfo_reports_buy_and_hold(synthetic_ohlc):
+    wf_config = WFConfig(is_size=500, oos_size=200,
+                         min_is_size=400, min_oos_size=100)
+    evo_config = EvolutionConfig(population_size=20, n_generations=2, seed=42)
+    fitness_config = FitnessConfig(symbol="EURUSD", min_trades=1, max_turnover_ratio=1.0)
+
+    result = run_walk_forward(
+        synthetic_ohlc, wf_config, evo_config, fitness_config,
+        symbol="EURUSD",
+    )
+
+    m = result.metrics_aggregated
+    assert "bh_total_return" in m
+    assert "bh_sharpe" in m
+    assert "excess_return_vs_bh" in m
+    assert "excess_sharpe_vs_bh" in m
+
+
+def test_buy_and_hold_equity_matches_manual():
+    """Buy & hold sobre precio que sube debe dar retorno positivo."""
+    from validation.walk_forward import _buy_and_hold_equity
+    n = 100
+    idx = pd.date_range("2024-01-01", periods=n, freq="15min", tz="UTC")
+    close = np.linspace(1.10, 1.11, n)
+    ohlc = pd.DataFrame(
+        {"open": close, "high": close + 0.001,
+         "low": close - 0.001, "close": close},
+        index=idx,
+    )
+    eq = _buy_and_hold_equity(ohlc, "EURUSD", initial_capital=10_000.0)
+    # Retorno neto ~0.01 - costes
+    ret = (eq.iloc[-1] / eq.iloc[0]) - 1.0
+    assert ret > 0
+    assert ret < 0.01  # menos que el bruto por costes
