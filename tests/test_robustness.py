@@ -115,6 +115,7 @@ def test_tracker_register_and_load(tmp_path):
 
     tracker.register(
         symbol="EURUSD",
+        n_trials=1000,
         config={"a": 1, "b": 2},
         is_metrics={"sharpe": 1.0},
         oos_metrics={"sharpe": 0.5},
@@ -133,6 +134,7 @@ def test_tracker_deflated_sharpe(tmp_path):
     for i in range(100):
         tracker.register(
             symbol="EURUSD",
+            n_trials=1000,
             config={"seed": i},
             is_metrics={},
             oos_metrics={},
@@ -167,3 +169,23 @@ def test_split_rejects_small_final_test():
     config = SplitConfig(final_test_ratio=0.10, save_final_test=False)
     with pytest.raises(ValueError, match="final test demasiado pequeño|1000"):
         split_development_final(df, config)
+        
+def test_tracker_n_trials(tmp_path):
+    from experiments.tracker import ExperimentTracker
+    tracker = ExperimentTracker(tmp_path / "t.jsonl", symbol="EURUSD")
+    tracker.register(
+        symbol="EURUSD", n_trials=1000,
+        config={"a": 1}, is_metrics={}, oos_metrics={},
+    )
+    assert tracker.records[0].n_trials == 1000
+
+
+def test_sharpe_ci_returns_finite_for_large_sample():
+    from validation.walk_forward import _sharpe_ci
+    import pandas as pd, numpy as np
+    idx = pd.date_range("2024-01-01", periods=1000, freq="15min", tz="UTC")
+    rng = np.random.default_rng(0)
+    eq = pd.Series(10000 * np.exp(np.cumsum(rng.normal(0.0001, 0.001, 1000))), index=idx)
+    sr, se, lo, hi = _sharpe_ci(eq, "EURUSD")
+    assert np.isfinite(se) and np.isfinite(lo) and np.isfinite(hi)
+    assert lo < sr < hi

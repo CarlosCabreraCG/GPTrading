@@ -30,6 +30,7 @@ class ExperimentRecord:
     experiment_id: str
     timestamp: str
     symbol: str
+    n_trials: int
     config: dict
     is_metrics: dict
     oos_metrics: dict
@@ -71,6 +72,7 @@ class ExperimentTracker:
     def register(
         self,
         symbol: str,
+        n_trials: int,
         config: dict,
         is_metrics: dict,
         oos_metrics: dict,
@@ -84,6 +86,7 @@ class ExperimentTracker:
             experiment_id=exp_id,
             timestamp=ts,
             symbol=symbol,
+            n_trials=n_trials,
             config=config,
             is_metrics=is_metrics,
             oos_metrics=oos_metrics,
@@ -118,7 +121,8 @@ class ExperimentTracker:
         """
         from scipy.stats import norm
 
-        n_trials = max(self.n_experiments, 1)
+        total_trials = sum(r.n_trials for r in self.records) if self.records else 1
+        n_trials = max(total_trials, 1)
 
         # Sharpe esperado bajo H0 con n_trials independientes
         # E[max(Sharpe)] ≈ sqrt(2 * log(n_trials)) para muestras grandes

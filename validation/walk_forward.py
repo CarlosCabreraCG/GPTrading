@@ -336,6 +336,14 @@ def _aggregate_metrics(
             out["bh_sharpe"] = bh_sh
             out["excess_return_vs_bh"] = out["stitched_total_return"] - bh_ret
             out["excess_sharpe_vs_bh"] = out["stitched_sharpe"] - bh_sh
+            sr, se, ci_low, ci_high = _sharpe_ci(equity_stitched, symbol)
+            out["stitched_sharpe_se"] = se
+            out["stitched_sharpe_ci_low"] = ci_low
+            out["stitched_sharpe_ci_high"] = ci_high
+            out["stitched_sharpe_significant"] = bool(
+                np.isfinite(ci_low) and np.isfinite(ci_high)
+                and (ci_low > 0 or ci_high < 0)
+            )
 
     return out
 
@@ -357,3 +365,22 @@ def _buy_and_hold_equity(ohlc: pd.DataFrame, symbol: str,
     equity = pd.Series(initial_capital, index=ohlc.index)
     equity.iloc[-1] = initial_capital + net_pnl
     return equity
+
+def _sharpe_ci(equity: pd.Series, symbol: str, alpha: float = 0.05
+               ) -> tuple[float, float, float, float]:
+    """
+    Devuelve (sharpe, se, ci_low, ci_high) para la equity dada.
+    Usa la aproximación de Lo (2002) con skew y kurt.
+    """
+    from scipy.stats import norm
+    sr = sharpe(equity, symbol)
+    returns = equity.pct_change().dropna()
+    n = len(returns)
+    if n < 30:
+        return sr, float("nan"), float("nan"), float("nan")
+    skew = float(returns.skew())
+    kurt = float(returns.kurtosis()) + 3.0  # kurtosis no-exceso
+    var_sr = (1 - skew * sr + ((kurt - 1) / 4) * sr**2) / max(n - 1, 1)
+    se = float(np.sqrt(max(var_sr, 0.0)))
+    z = float(norm.ppf(1 - alpha / 2))
+    return sr, se, sr - z * se, sr + z * se
