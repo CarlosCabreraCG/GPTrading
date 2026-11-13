@@ -240,8 +240,19 @@ def run_walk_forward(
     else:
         equity_stitched = None
 
+    ohlc_pieces = [fr.fold.oos_df for fr in fold_results]
+    if ohlc_pieces:
+        ohlc_stitched = pd.concat(ohlc_pieces)
+    else:
+        ohlc_stitched = None
+
     # Métricas agregadas
-    metrics_aggregated = _aggregate_metrics(fold_results, equity_stitched, symbol)
+    metrics_aggregated = _aggregate_metrics(
+        fold_results, equity_stitched,
+        ohlc_stitched=ohlc_stitched,
+        symbol=symbol,
+        initial_capital=initial_capital,
+    )
 
     # Acumular error_stats de todos los folds
     total_errors = {"evaluate": 0, "backtest": 0}
@@ -265,7 +276,9 @@ def run_walk_forward(
 def _aggregate_metrics(
     fold_results: list[FoldResult],
     equity_stitched: pd.Series | None,
-    symbol: str = "XAUUSD"
+    ohlc_stitched: pd.DataFrame | None = None,
+    symbol: str = "XAUUSD",
+    initial_capital: float = 10_000.0,
 ) -> dict:
     """Calcula métricas agregadas del WFO."""
     if not fold_results:
@@ -293,15 +306,6 @@ def _aggregate_metrics(
         "worst_fold_dd": float(np.min(oos_dds)),
         "mean_fold_dd": float(np.mean(oos_dds)),
     }
-
-    if equity_stitched is not None and len(equity_stitched) > 1:
-        out["stitched_total_return"] = float(
-            (equity_stitched.iloc[-1] / equity_stitched.iloc[0]) - 1.0
-        )
-        out["stitched_sharpe"] = sharpe(equity_stitched, symbol)
-        out["stitched_max_dd"] = float(
-            (equity_stitched / equity_stitched.cummax() - 1.0).min()
-        )
     is_sharpes = [fr.is_sharpe for fr in fold_results]
     degradations = []
     for fr in fold_results:
@@ -315,5 +319,41 @@ def _aggregate_metrics(
         "median_degradation": float(np.median(degradations)) if degradations else 0.0,
         "pct_folds_degraded": float(np.mean([fr.oos_sharpe < fr.is_sharpe for fr in fold_results])),
     })
+    if equity_stitched is not None and len(equity_stitched) > 1:
+        out["stitched_total_return"] = float(
+            (equity_stitched.iloc[-1] / equity_stitched.iloc[0]) - 1.0
+        )
+        out["stitched_sharpe"] = sharpe(equity_stitched, symbol)
+        out["stitched_max_dd"] = float(
+            (equity_stitched / equity_stitched.cummax() - 1.0).min()
+        )
+
+        if ohlc_stitched is not None:
+            bh_eq = _buy_and_hold_equity(ohlc_stitched, symbol, initial_capital)
+            bh_ret = float((bh_eq.iloc[-1] / bh_eq.iloc[0]) - 1.0)
+            bh_sh = sharpe(bh_eq, symbol)
+            out["bh_total_return"] = bh_ret
+            out["bh_sharpe"] = bh_sh
+            out["excess_return_vs_bh"] = out["stitched_total_return"] - bh_ret
+            out["excess_sharpe_vs_bh"] = out["stitched_sharpe"] - bh_sh
 
     return out
+
+def _buy_and_hold_equity(ohlc: pd.DataFrame, symbol: str,
+                         initial_capital: float = 10_000.0) -> pd.Series:
+    """
+    Equity de buy & hold: compra al open de la primera vela, vende al close
+    de la última. Aplica costes de una operación completa.
+    """
+    from config.settings import get_costs
+    costs = get_costs(symbol)
+    entry = float(ohlc["open"].iloc[0])
+    exit_ = float(ohlc["close"].iloc[-1])
+    one_side = costs.spread / 2 + costs.slippage + costs.commission_per_trade / 2.0
+    # PnL neto por unidad: (exit - entry) - 2 * one_side
+    net_pnl = (exit_ - entry) - 2 * one_side
+    # Equity constante en cada vela: capital + PnL neto
+    # (no modelamos mark-to-market intermedio, solo el resultado final)
+    equity = pd.Series(initial_capital, index=ohlc.index)
+    equity.iloc[-1] = initial_capital + net_pnl
+    return equity
