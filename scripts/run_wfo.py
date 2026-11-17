@@ -58,6 +58,8 @@ def main():
     parser.add_argument("--max-flat-ratio", type=float, default=0.90)
     parser.add_argument("--turnover-penalty", type=float, default=0.5)
     parser.add_argument("--inactivity-penalty", type=float, default=0.1)
+    parser.add_argument("--bars-per-month", type=int, default=2100,
+                    help="Velas por mes (2100 para 15m, 128 para H4)")
     args = parser.parse_args()
 
     if args.symbol is None:
@@ -102,7 +104,7 @@ def main():
     # ------------------------------------------------------------------
     # 3. Generar folds
     # ------------------------------------------------------------------
-    VELAS_POR_MES = 2100 # 2100 para 15m  |  128 por 4H
+    VELAS_POR_MES = args.bars_per_month # 2100 para 15m  |  128 por 4H
 
     wf_config = WFConfig(
         is_size=args.is_months * VELAS_POR_MES,
