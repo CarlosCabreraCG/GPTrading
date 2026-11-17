@@ -45,6 +45,8 @@ SUPPORTED_SYMBOLS: Final[tuple[str, ...]] = (
     "BRENT",
     "USA500",
     "USATECH",
+    "DXY",
+    "BTCUSD",
 )
 
 # ---------------------------------------------------------------------------
@@ -118,6 +120,8 @@ _DEFAULT_COSTS: dict[str, CostModel] = {
     "BRENT":  CostModel(spread=0.03, slippage=0.01, commission_per_trade=0.0),
     "USA500": CostModel(spread=0.50, slippage=0.20, commission_per_trade=0.0),
     "USATECH": CostModel(spread=2.00, slippage=0.80, commission_per_trade=0.0),
+    "DXY": CostModel( spread=0.05, slippage=0.02, commission_per_trade=0.0 ), 
+    "BTCUSD": CostModel( spread=20.0, slippage=10.0, commission_per_trade=0.0 ),
 }
 
 
@@ -258,6 +262,8 @@ TRADING_HOURS_PER_WEEK: Final[dict[str, float]] = {
     "BRENT": 115.0,
     "USA500": 32.5,
     "USATECH": 32.5,
+    "DXY": 120.0,
+    "BTCUSD": 168.0,
 }
 
 def bars_per_year(symbol: str, bar_seconds: float) -> float:
