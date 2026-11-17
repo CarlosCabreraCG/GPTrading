@@ -124,6 +124,16 @@ python main.py
     --generations 8 
     --seed 42
 ```
+
+7. Pipeline con meses (months)
+```bash
+python -m scripts.run_wfo
+    --csv data_files/xauusd_4h_5y.csv
+    --output experiments_output/wfo_gold_h4
+    --is-months 12 --oos-months 3
+    --bars-per-month 128
+```
+
 Llama a run_wfo con la configuración por defecto.
 
 Tests
