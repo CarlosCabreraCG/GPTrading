@@ -26,3 +26,7 @@ otros.py
 # Ignore scripts
 check_cross.py
 datastractor.py
+
+.pytest_cache
+
+data_files/

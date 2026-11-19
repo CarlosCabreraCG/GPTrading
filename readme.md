@@ -243,5 +243,3 @@ WFO con folds rolling y final test intocable.
 Tracker para auditar multiple testing.
 
 Tests que garantizan ausencia de look-ahead.
-
-text
