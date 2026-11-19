@@ -17,15 +17,19 @@ import json
 from pathlib import Path
 
 from gp.evaluator import TreeNode
-from gp.grammar import DEFAULT_GRAMMAR, Grammar
+from gp.grammar import DEFAULT_GRAMMAR, FEATURE_TERMINALS, Grammar
 from gp.individual import Individual
 from gp.nodes import Node
 from gp.types import GPType
 
 
 def _build_node_index(grammar: Grammar) -> dict[str, Node]:
-    """Indexa todos los nodos de la gramática por nombre."""
-    index: dict[str, Node] = {}
+    """
+    Indexa por nombre los nodos de la gramática más todos los terminales de
+    features registradas, para poder cargar individuos con features que la
+    gramática concreta no incluya (p. ej. cross-asset con DEFAULT_GRAMMAR).
+    """
+    index: dict[str, Node] = dict(FEATURE_TERMINALS)
     for t in (GPType.POSITION, GPType.BOOLEAN, GPType.REAL):
         for node in grammar.nodes_for(t):
             index[node.name] = node

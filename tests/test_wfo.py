@@ -18,27 +18,39 @@ from validation.walk_forward import (
     _aggregate_metrics,
     run_walk_forward,
 )
+from tests.conftest import extra_required_columns, make_full_ohlc, make_ohlc
 
 
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
 
+_WFO_OHLC_PARAMS = dict(n=2000, seed=42, drift=0.00001, vol=0.001, wick=0.0003)
+
+
 @pytest.fixture
 def synthetic_ohlc() -> pd.DataFrame:
-    """OHLC sintético de 2000 velas de 15m, sin gaps."""
-    n = 2000
-    idx = pd.date_range("2024-01-01", periods=n, freq="15min", tz="UTC")
-    rng = np.random.default_rng(42)
-    returns = rng.normal(0.00001, 0.001, n)
-    close = 1.10 * np.exp(np.cumsum(returns))
-    open_ = np.concatenate([[close[0]], close[:-1]])
-    high = np.maximum(open_, close) * (1 + rng.uniform(0, 0.0003, n))
-    low = np.minimum(open_, close) * (1 - rng.uniform(0, 0.0003, n))
-    return pd.DataFrame(
-        {"open": open_, "high": high, "low": low, "close": close},
-        index=idx,
+    """OHLC sintético de 2000 velas de 15m, sin gaps (solo OHLC)."""
+    return make_ohlc(**_WFO_OHLC_PARAMS)
+
+
+@pytest.fixture
+def synthetic_ohlc_full() -> pd.DataFrame:
+    """Igual que synthetic_ohlc + todas las columnas requeridas por el registro."""
+    return make_full_ohlc(**_WFO_OHLC_PARAMS)
+
+
+def _small_wfo_configs() -> tuple[WFConfig, EvolutionConfig, FitnessConfig]:
+    wf_config = WFConfig(
+        is_size=500, oos_size=200,
+        min_is_size=400, min_oos_size=150,
     )
+    evo_config = EvolutionConfig(
+        population_size=10, n_generations=1, tournament_size=3,
+        n_elites=1, crossover_rate=0.8, mutation_rate=0.2, seed=42,
+    )
+    fitness_config = FitnessConfig(symbol="EURUSD", min_trades=1, max_turnover_ratio=1.0)
+    return wf_config, evo_config, fitness_config
 
 
 # ---------------------------------------------------------------------------
@@ -400,3 +412,58 @@ def test_buy_and_hold_equity_matches_manual():
     ret = (eq.iloc[-1] / eq.iloc[0]) - 1.0
     assert ret > 0
     assert ret < 0.01  # menos que el bruto por costes
+
+# ---------------------------------------------------------------------------
+# Features disponibles y gramática en WFO
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("fixture_name", ["synthetic_ohlc", "synthetic_ohlc_full"])
+def test_wfo_grammar_matches_available_features(fixture_name, request, monkeypatch):
+    """
+    La gramática que recibe evolve contiene exactamente las features
+    calculables con las columnas del DataFrame, y GP no produce errores de
+    evaluación por features ausentes.
+    """
+    from features.registry import available_features
+    from validation import walk_forward as wf_module
+
+    ohlc = request.getfixturevalue(fixture_name)
+    grammars = []
+    original_evolve = wf_module.evolve
+
+    def spy_evolve(fitness_fn, config, grammar=None):
+        grammars.append(grammar)
+        return original_evolve(fitness_fn=fitness_fn, config=config, grammar=grammar)
+
+    monkeypatch.setattr(wf_module, "evolve", spy_evolve)
+
+    wf_config, evo_config, fitness_config = _small_wfo_configs()
+    result = run_walk_forward(
+        ohlc, wf_config, evo_config, fitness_config, symbol="EURUSD",
+    )
+
+    expected = available_features(ohlc.columns)
+    assert grammars, "evolve no se llamó"
+    for g in grammars:
+        assert list(g.terminal_features()) == expected
+    assert result.metrics_aggregated["errors_evaluate"] == 0
+
+
+def test_wfo_strict_raises_without_required_columns(synthetic_ohlc):
+    if not extra_required_columns():
+        pytest.skip("El registro no tiene features que requieran columnas extra")
+    wf_config, evo_config, fitness_config = _small_wfo_configs()
+    with pytest.raises(ValueError, match="columnas ausentes"):
+        run_walk_forward(
+            synthetic_ohlc, wf_config, evo_config, fitness_config,
+            symbol="EURUSD", strict=True,
+        )
+
+
+def test_wfo_strict_ok_with_all_columns(synthetic_ohlc_full):
+    wf_config, evo_config, fitness_config = _small_wfo_configs()
+    result = run_walk_forward(
+        synthetic_ohlc_full, wf_config, evo_config, fitness_config,
+        symbol="EURUSD", strict=True,
+    )
+    assert len(result.fold_results) > 0

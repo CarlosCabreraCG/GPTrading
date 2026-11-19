@@ -20,30 +20,17 @@ from validation.robustness import (
     evaluate_on_other_data,
     summarize_robustness,
 )
+from tests.conftest import make_linear_ohlc
 
 
 @pytest.fixture
 def ohlc_1() -> pd.DataFrame:
-    n = 500
-    idx = pd.date_range("2024-01-01", periods=n, freq="15min", tz="UTC")
-    close = np.linspace(1.10, 1.11, n)
-    return pd.DataFrame(
-        {"open": close, "high": close + 0.0001,
-         "low": close - 0.0001, "close": close},
-        index=idx,
-    )
+    return make_linear_ohlc(500, 1.10, 1.11)
 
 
 @pytest.fixture
 def ohlc_2() -> pd.DataFrame:
-    n = 500
-    idx = pd.date_range("2024-01-01", periods=n, freq="15min", tz="UTC")
-    close = np.linspace(1.20, 1.19, n)
-    return pd.DataFrame(
-        {"open": close, "high": close + 0.0001,
-         "low": close - 0.0001, "close": close},
-        index=idx,
-    )
+    return make_linear_ohlc(500, 1.20, 1.19)
 
 
 @pytest.fixture
@@ -157,19 +144,30 @@ def test_split_config_rejects_too_large_ratio():
         SplitConfig(final_test_ratio=0.6)
 
 
-def test_split_rejects_small_final_test():
-    # Dataset de 5000 filas con ratio 0.10 -> 500 filas, < 1000. Debe fallar.
-    n = 5000
+def _flat_ohlc(n: int) -> pd.DataFrame:
     idx = pd.date_range("2024-01-01", periods=n, freq="15min", tz="UTC")
-    df = pd.DataFrame(
+    return pd.DataFrame(
         {"open": np.ones(n), "high": np.ones(n),
          "low": np.ones(n), "close": np.ones(n)},
         index=idx,
     )
+
+
+def test_split_rejects_small_final_test():
+    # 4990 filas con ratio 0.10 -> 499 velas, < 500 (mínimo). Debe fallar.
     config = SplitConfig(final_test_ratio=0.10, save_final_test=False)
-    with pytest.raises(ValueError, match="final test demasiado pequeño|1000"):
-        split_development_final(df, config)
-        
+    with pytest.raises(ValueError, match="Final test demasiado pequeño.*mínimo 500"):
+        split_development_final(_flat_ohlc(4990), config)
+
+
+def test_split_accepts_minimum_final_test():
+    # 5000 filas con ratio 0.10 -> 500 velas, justo el mínimo. Debe aceptarse.
+    config = SplitConfig(final_test_ratio=0.10, save_final_test=False)
+    development, final_test = split_development_final(_flat_ohlc(5000), config)
+    assert len(final_test) == 500
+    assert len(development) == 4500
+
+
 def test_tracker_n_trials(tmp_path):
     from experiments.tracker import ExperimentTracker
     tracker = ExperimentTracker(tmp_path / "t.jsonl", symbol="EURUSD")

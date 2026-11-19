@@ -12,8 +12,8 @@ GP NO puede inventar features. Solo puede usar las que están aquí.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Callable
+from dataclasses import dataclass, field
+from typing import Callable, Iterable
 
 import numpy as np
 import pandas as pd
@@ -25,11 +25,23 @@ from features import indicators as ind
 # Definición de una feature
 # ---------------------------------------------------------------------------
 
+#: Columnas OHLC base. Toda feature que no declare `requires` depende de ellas.
+OHLC_COLUMNS: frozenset[str] = frozenset({"open", "high", "low", "close"})
+
+
 @dataclass(frozen=True)
 class FeatureSpec:
+    """
+    name: nombre estable (terminal GP).
+    func: cálculo causal sobre el DataFrame.
+    description: texto legible.
+    requires: columnas del DataFrame que la feature necesita. Si alguna falta,
+        la feature no está disponible para ese DataFrame.
+    """
     name: str
     func: Callable[[pd.DataFrame], pd.Series]
     description: str
+    requires: frozenset[str] = field(default=OHLC_COLUMNS)
 
 
 # ---------------------------------------------------------------------------
@@ -147,26 +159,69 @@ FEATURES: dict[str, FeatureSpec] = {
     "dist_prev_low_20":  FeatureSpec("dist_prev_low_20",  lambda df: _dist_prev_low_atr(df, 20, 14),  "(close - min(low,20).shift(1)) / ATR(14)"),
     "bb_position_20":    FeatureSpec("bb_position_20",    lambda df: _bb_position(df, 20, 2.0),       "(close - BB_mid) / (BB_up - BB_low)"),
     "bb_width_20":       FeatureSpec("bb_width_20",       lambda df: _bb_width(df, 20, 2.0),          "(BB_up - BB_low) / BB_mid"),
-
-    # Se añaden los feature cross cuando hay columnas xagusd_close, dxy_close, etc... 
-    # --- Feature Cross XAGUSD ---
-    "xagusd_ret_1":       FeatureSpec( name="xagusd_ret_1", func=lambda df: df["xagusd_close"].pct_change(1), description="Retorno 1 vela del XAGUSD", ),
-    "spread_gold_xagusd": FeatureSpec( name="spread_gold_xagusd", func=lambda df: df["close"].pct_change(1) - df["xagusd_close"].pct_change(1), description="Diferencial retorno oro vs XAGUSD", ),
-
-    # --- Feature Cross DXY ---
-    "dxy_ret_1":       FeatureSpec( name="dxy_ret_1", func=lambda df: df["dxy_close"].pct_change(1), description="Retorno 1 vela del DXY", ),
-    "spread_gold_dxy": FeatureSpec( name="spread_gold_dxy", func=lambda df: df["close"].pct_change(1) - df["dxy_close"].pct_change(1), description="Diferencial retorno oro vs DXY", ),
-
-    # --- Feature Cross WTI ---
-    "wti_ret_1":       FeatureSpec( name="wti_ret_1", func=lambda df: df["wti_close"].pct_change(1), description="Retorno 1 vela del WTI", ),
-    "spread_gold_wti": FeatureSpec( name="spread_gold_wti", func=lambda df: df["close"].pct_change(1) - df["wti_close"].pct_change(1), description="Diferencial retorno oro vs WTI", ),
-
-    # --- Feature Cross BTC ---
-    #"btcusd_ret_1":       FeatureSpec( name="btcusd_ret_1", func=lambda df: df["btcusd_close"].pct_change(1), description="Retorno 1 vela del BTCUSD", ),
-    #"spread_gold_btcusd": FeatureSpec( name="spread_gold_btcusd", func=lambda df: df["close"].pct_change(1) - df["btcusd_close"].pct_change(1), description="Diferencial retorno oro vs BTCUSD", )
 }
 
 
+# ---------------------------------------------------------------------------
+# Features cross-asset (generadas desde CROSS_ASSETS)
+# ---------------------------------------------------------------------------
+
+#: Activos cross-asset. Para cada `sym` se espera la columna `{sym}_close`
+#: (merge previo a compute_features). Añadir un activo aquí genera sus features.
+CROSS_ASSETS: tuple[str, ...] = ("xagusd", "dxy", "wti")
+
+
+def _cross_asset_features(sym: str) -> dict[str, FeatureSpec]:
+    """Genera las features cross-asset de un activo `sym`."""
+    col = f"{sym}_close"
+    requires = frozenset({"close", col})
+    return {
+        f"{sym}_ret_1": FeatureSpec(
+            name=f"{sym}_ret_1",
+            func=lambda df: df[col].pct_change(1),
+            description=f"Retorno 1 vela de {sym.upper()}",
+            requires=requires,
+        ),
+        f"spread_ret_{sym}": FeatureSpec(
+            name=f"spread_ret_{sym}",
+            func=lambda df: df["close"].pct_change(1) - df[col].pct_change(1),
+            description=f"Diferencial de retorno 1 vela: activo base - {sym.upper()}",
+            requires=requires,
+        ),
+    }
+
+
+for _sym in CROSS_ASSETS:
+    FEATURES.update(_cross_asset_features(_sym))
+
+
+# ---------------------------------------------------------------------------
+# Consultas sobre el registro
+# ---------------------------------------------------------------------------
+
 def feature_names() -> list[str]:
-    """Lista ordenada de nombres de features disponibles."""
+    """Lista ordenada de TODAS las features registradas."""
     return list(FEATURES.keys())
+
+
+def available_features(columns: Iterable[str]) -> list[str]:
+    """
+    Features calculables con las columnas dadas (todas sus `requires` presentes).
+
+    Mantiene el orden del registro.
+    """
+    cols = set(columns)
+    return [name for name, spec in FEATURES.items() if spec.requires <= cols]
+
+
+def ohlc_feature_names() -> list[str]:
+    """Features calculables solo con OHLC."""
+    return available_features(OHLC_COLUMNS)
+
+
+def required_columns() -> set[str]:
+    """Unión de todas las columnas que requiere el registro."""
+    out: set[str] = set()
+    for spec in FEATURES.values():
+        out |= spec.requires
+    return out

@@ -3,86 +3,77 @@ Tests de features.
 
 El test más importante es el de causalidad: una feature calculada hasta t
 NO debe cambiar si añadimos datos después de t.
+
+Data-driven: los tests por feature se parametrizan sobre
+`available_features(columnas de make_full_ohlc())`, así que cualquier feature
+nueva del registro (OHLC, cross-asset o de contexto) se testea sin tocar
+este archivo.
 """
 
 from __future__ import annotations
+
+import logging
 
 import numpy as np
 import pandas as pd
 import pytest
 
 from features import indicators as ind
-from features.engine import compute_features, drop_warmup_rows
-from features.registry import FEATURES, feature_names
+from features.engine import compute_features, drop_warmup_rows, resolve_features
+from features.registry import (
+    CROSS_ASSETS,
+    FEATURES,
+    available_features,
+    feature_names,
+    ohlc_feature_names,
+)
+from tests.conftest import extra_required_columns, make_full_ohlc
+
+#: Features calculables con el fixture completo (se usan para parametrizar).
+FULL_FEATURES = available_features(make_full_ohlc().columns)
 
 
 # ---------------------------------------------------------------------------
-# Fixtures
+# Cobertura del fixture
 # ---------------------------------------------------------------------------
 
-@pytest.fixture
-def synthetic_ohlc() -> pd.DataFrame:
+def test_full_fixture_covers_all_registered_features():
+    """El fixture completo debe permitir calcular TODAS las features del registro."""
+    assert FULL_FEATURES == feature_names()
+
+
+# ---------------------------------------------------------------------------
+# Tests de causalidad (NO look-ahead), una instancia por feature
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("name", FULL_FEATURES)
+def test_feature_is_causal(ohlc_full, name):
     """
-    Genera un DataFrame OHLC sintético con propiedades conocidas.
-    Precio sigue un random walk con tendencia suave.
-    """
-    rng = np.random.default_rng(42)
-    n = 500
-    idx = pd.date_range("2024-01-01", periods=n, freq="15min", tz="UTC")
-
-    # Random walk con drift pequeño
-    returns = rng.normal(loc=0.00005, scale=0.001, size=n)
-    close = 1.10 * np.exp(np.cumsum(returns))
-
-    # Construir OHLC coherente
-    open_ = np.concatenate([[close[0]], close[:-1]])
-    high = np.maximum(open_, close) * (1 + rng.uniform(0, 0.0005, size=n))
-    low = np.minimum(open_, close) * (1 - rng.uniform(0, 0.0005, size=n))
-
-    df = pd.DataFrame(
-        {"open": open_, "high": high, "low": low, "close": close},
-        index=idx,
-    )
-    return df
-
-
-# ---------------------------------------------------------------------------
-# Tests de causalidad (NO look-ahead)
-# ---------------------------------------------------------------------------
-
-def test_all_features_are_causal(synthetic_ohlc):
-    """
-    Para cada feature: calcularla en la serie completa vs en una truncada
-    debe dar exactamente el mismo resultado en el tramo común.
+    Calcular la feature en la serie completa vs en una truncada debe dar
+    exactamente el mismo resultado en el tramo común.
 
     Si una feature usara datos futuros, los valores del tramo común cambiarían.
     """
-    df = synthetic_ohlc
+    df = ohlc_full
     split = 300  # truncamos aquí
 
-    df_truncated = df.iloc[:split]
+    full_vals = compute_features(df, names=[name])[name].iloc[:split]
+    trunc_vals = compute_features(df.iloc[:split], names=[name])[name]
 
-    features_full = compute_features(df)
-    features_trunc = compute_features(df_truncated)
-
-    for name in feature_names():
-        full_vals = features_full[name].iloc[:split]
-        trunc_vals = features_trunc[name]
-
-        # NaN en el mismo sitio, valores iguales donde no hay NaN
-        pd.testing.assert_series_equal(
-            full_vals,
-            trunc_vals,
-            check_names=False,
-            check_exact=False,
-            rtol=1e-10,
-            atol=1e-12,
-            obj=f"Feature '{name}' no es causal (look-ahead bias)",
-        )
+    # NaN en el mismo sitio, valores iguales donde no hay NaN
+    pd.testing.assert_series_equal(
+        full_vals,
+        trunc_vals,
+        check_names=False,
+        check_exact=False,
+        rtol=1e-10,
+        atol=1e-12,
+        obj=f"Feature '{name}' no es causal (look-ahead bias)",
+    )
 
 
-def test_atr_causal(synthetic_ohlc):
-    df = synthetic_ohlc
+def test_atr_causal(ohlc_only):
+    df = ohlc_only
     split = 200
     a_full = ind.atr(df["high"], df["low"], df["close"], 14)
     a_trunc = ind.atr(
@@ -93,8 +84,8 @@ def test_atr_causal(synthetic_ohlc):
     )
 
 
-def test_rsi_causal(synthetic_ohlc):
-    df = synthetic_ohlc
+def test_rsi_causal(ohlc_only):
+    df = ohlc_only
     split = 200
     r_full = ind.rsi(df["close"], 14)
     r_trunc = ind.rsi(df["close"].iloc[:split], 14)
@@ -103,8 +94,8 @@ def test_rsi_causal(synthetic_ohlc):
     )
 
 
-def test_adx_causal(synthetic_ohlc):
-    df = synthetic_ohlc
+def test_adx_causal(ohlc_only):
+    df = ohlc_only
     split = 200
     adx_full = ind.adx(df["high"], df["low"], df["close"], 14)
     adx_trunc = ind.adx(
@@ -129,55 +120,112 @@ def test_sma_matches_manual():
     assert result.iloc[4] == pytest.approx(4.0)
 
 
-def test_rsi_bounds(synthetic_ohlc):
-    r = ind.rsi(synthetic_ohlc["close"], 14).dropna()
+def test_rsi_bounds(ohlc_only):
+    r = ind.rsi(ohlc_only["close"], 14).dropna()
     assert (r >= 0).all()
     assert (r <= 100).all()
 
 
-def test_adx_bounds(synthetic_ohlc):
+def test_adx_bounds(ohlc_only):
     a = ind.adx(
-        synthetic_ohlc["high"], synthetic_ohlc["low"], synthetic_ohlc["close"], 14
+        ohlc_only["high"], ohlc_only["low"], ohlc_only["close"], 14
     ).dropna()
     assert (a >= 0).all()
     assert (a <= 100).all()
 
 
-def test_bb_position_within_reasonable_range(synthetic_ohlc):
+def test_bb_position_within_reasonable_range(ohlc_only):
     """bb_position no está limitada a [-1, 1] por construcción,
     pero en datos sintéticos razonables debería estar en un rango acotado."""
-    feats = compute_features(synthetic_ohlc)
+    feats = compute_features(ohlc_only)
     bb = feats["bb_position_20"].dropna()
     # Sin outliers extremos
     assert bb.abs().max() < 5.0
 
 
-def test_no_feature_is_constant(synthetic_ohlc):
+@pytest.mark.parametrize("name", FULL_FEATURES)
+def test_feature_is_not_constant(ohlc_full, name):
     """Ninguna feature debe ser constante; si lo es, GP no puede usarla."""
-    feats = compute_features(synthetic_ohlc).dropna()
-    for name in feats.columns:
-        assert feats[name].nunique() > 10, f"Feature '{name}' casi constante"
+    vals = compute_features(ohlc_full, names=[name])[name].dropna()
+    assert vals.nunique() > 10, f"Feature '{name}' casi constante"
 
 
-def test_no_infinities(synthetic_ohlc):
+@pytest.mark.parametrize("name", FULL_FEATURES)
+def test_feature_has_no_infinities(ohlc_full, name):
     """Ninguna feature debe contener ±inf; solo valores finitos o NaN."""
-    feats = compute_features(synthetic_ohlc)
-    for name in feats.columns:
-        col = feats[name]
-        finite_or_nan = np.isfinite(col) | col.isna()
-        assert finite_or_nan.all(), f"Feature '{name}' contiene infinitos"
+    col = compute_features(ohlc_full, names=[name])[name]
+    finite_or_nan = np.isfinite(col) | col.isna()
+    assert finite_or_nan.all(), f"Feature '{name}' contiene infinitos"
 
 
-def test_features_aligned_with_input(synthetic_ohlc):
-    feats = compute_features(synthetic_ohlc)
-    assert len(feats) == len(synthetic_ohlc)
-    assert (feats.index == synthetic_ohlc.index).all()
+def test_features_aligned_with_input(ohlc_full):
+    feats = compute_features(ohlc_full)
+    assert len(feats) == len(ohlc_full)
+    assert (feats.index == ohlc_full.index).all()
 
 
-def test_drop_warmup_rows(synthetic_ohlc):
-    feats = compute_features(synthetic_ohlc)
-    df_aligned, feats_aligned = drop_warmup_rows(synthetic_ohlc, feats)
+def test_drop_warmup_rows(ohlc_full):
+    feats = compute_features(ohlc_full)
+    df_aligned, feats_aligned = drop_warmup_rows(ohlc_full, feats)
     assert len(df_aligned) == len(feats_aligned)
     assert feats_aligned.notna().all().all()
     # Debe haber eliminado al menos ~20 filas por warmup
-    assert len(df_aligned) < len(synthetic_ohlc)
+    assert len(df_aligned) < len(ohlc_full)
+
+
+# ---------------------------------------------------------------------------
+# Dependencias de columnas (requires) y disponibilidad
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("name", feature_names())
+def test_available_features_respects_requires(name):
+    """Una feature está disponible con sus `requires` y deja de estarlo si falta una."""
+    req = FEATURES[name].requires
+    assert name in available_features(req)
+    for col in req:
+        assert name not in available_features(req - {col})
+
+
+@pytest.mark.parametrize("sym", CROSS_ASSETS)
+def test_cross_asset_generates_features(sym):
+    col = f"{sym}_close"
+    for name in (f"{sym}_ret_1", f"spread_ret_{sym}"):
+        assert name in FEATURES, f"Falta {name} para {sym}"
+        assert col in FEATURES[name].requires
+
+
+def test_ohlc_only_excludes_cross_without_error(ohlc_only, caplog):
+    """Sin columnas cross-asset no hay KeyError: se excluyen con WARNING."""
+    with caplog.at_level(logging.WARNING, logger="features.engine"):
+        feats = compute_features(ohlc_only)
+    assert list(feats.columns) == ohlc_feature_names()
+    if extra_required_columns():
+        assert any(r.levelno == logging.WARNING for r in caplog.records)
+
+
+def test_full_data_emits_no_warning(ohlc_full, caplog):
+    with caplog.at_level(logging.WARNING, logger="features.engine"):
+        compute_features(ohlc_full)
+    assert not caplog.records
+
+
+def test_strict_raises_when_columns_missing(ohlc_only):
+    if not extra_required_columns():
+        pytest.skip("El registro no tiene features que requieran columnas extra")
+    with pytest.raises(ValueError, match="columnas ausentes"):
+        compute_features(ohlc_only, strict=True)
+    with pytest.raises(ValueError, match="columnas ausentes"):
+        resolve_features(ohlc_only.columns, strict=True)
+
+
+def test_explicit_unavailable_feature_raises(ohlc_only):
+    missing = [n for n in feature_names() if n not in ohlc_feature_names()]
+    if not missing:
+        pytest.skip("Todas las features son OHLC")
+    with pytest.raises(ValueError, match="columnas ausentes"):
+        compute_features(ohlc_only, names=[missing[0]])
+
+
+def test_explicit_unknown_feature_raises(ohlc_only):
+    with pytest.raises(ValueError, match="no registradas"):
+        compute_features(ohlc_only, names=["no_existe"])
