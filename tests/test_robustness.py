@@ -20,30 +20,17 @@ from validation.robustness import (
     evaluate_on_other_data,
     summarize_robustness,
 )
+from tests.conftest import make_linear_ohlc
 
 
 @pytest.fixture
 def ohlc_1() -> pd.DataFrame:
-    n = 500
-    idx = pd.date_range("2024-01-01", periods=n, freq="15min", tz="UTC")
-    close = np.linspace(1.10, 1.11, n)
-    return pd.DataFrame(
-        {"open": close, "high": close + 0.0001,
-         "low": close - 0.0001, "close": close},
-        index=idx,
-    )
+    return make_linear_ohlc(500, 1.10, 1.11)
 
 
 @pytest.fixture
 def ohlc_2() -> pd.DataFrame:
-    n = 500
-    idx = pd.date_range("2024-01-01", periods=n, freq="15min", tz="UTC")
-    close = np.linspace(1.20, 1.19, n)
-    return pd.DataFrame(
-        {"open": close, "high": close + 0.0001,
-         "low": close - 0.0001, "close": close},
-        index=idx,
-    )
+    return make_linear_ohlc(500, 1.20, 1.19)
 
 
 @pytest.fixture
