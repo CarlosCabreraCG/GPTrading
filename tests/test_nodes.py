@@ -169,11 +169,42 @@ def test_grammar_real_nodes_include_features():
     assert {"ADD", "SUB", "MUL", "DIV", "SQRT", "LOG", "ABS", "NEG", "INV"}.issubset(names)
 
 
-def test_grammar_feature_terminals_match_registry():
+def test_feature_terminals_match_registry():
     from features.registry import feature_names
-    grammar_features = set(DEFAULT_GRAMMAR.terminal_features())
-    registry_features = set(feature_names())
-    assert grammar_features == registry_features
+    assert set(FEATURE_TERMINALS) == set(feature_names())
+
+
+def test_default_grammar_is_ohlc_only():
+    """DEFAULT_GRAMMAR solo usa features calculables con OHLC."""
+    from features.registry import ohlc_feature_names
+    assert list(DEFAULT_GRAMMAR.terminal_features()) == ohlc_feature_names()
+
+
+def test_build_grammar_with_feature_subset():
+    from gp.grammar import build_grammar
+    subset = ["return_1", "rsi_14"]
+    g = build_grammar(subset)
+    assert list(g.terminal_features()) == subset
+    real_names = {n.name for n in g.nodes_for(GPType.REAL)}
+    assert {"ADD", "SUB", "MUL", "DIV"}.issubset(real_names)
+
+
+def test_build_grammar_with_all_features():
+    from features.registry import feature_names
+    from gp.grammar import build_grammar
+    assert list(build_grammar(feature_names()).terminal_features()) == feature_names()
+
+
+def test_build_grammar_rejects_unknown_feature():
+    from gp.grammar import build_grammar
+    with pytest.raises(ValueError, match="no registradas"):
+        build_grammar(["no_existe"])
+
+
+def test_build_grammar_rejects_empty():
+    from gp.grammar import build_grammar
+    with pytest.raises(ValueError, match="al menos una feature"):
+        build_grammar([])
 
 
 def test_all_nodes_have_consistent_arity():

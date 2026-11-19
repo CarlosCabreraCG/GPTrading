@@ -11,8 +11,9 @@ La construcción viene en 3b (individual.py, population.py).
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Iterable
 
-from features.registry import feature_names
+from features.registry import feature_names, ohlc_feature_names
 from gp.nodes import (
     NODE_ABS,
     NODE_ADD,
@@ -60,6 +61,8 @@ def _make_feature_terminal(name: str) -> Node:
     )
 
 
+#: Terminales de TODAS las features registradas (OHLC + cross-asset).
+#: Una gramática concreta usa solo un subconjunto (ver build_grammar).
 FEATURE_TERMINALS: dict[str, Node] = {
     name: _make_feature_terminal(name) for name in feature_names()
 }
@@ -83,12 +86,19 @@ class Grammar:
         return self.productions[return_type]
 
     def terminal_features(self) -> tuple[str, ...]:
-        return tuple(FEATURE_TERMINALS.keys())
+        """Features que esta gramática puede usar como terminales REAL."""
+        return tuple(
+            n.name for n in self.productions[GPType.REAL] if n.name in FEATURE_TERMINALS
+        )
 
 
-def build_grammar() -> Grammar:
+def build_grammar(features: Iterable[str] | None = None) -> Grammar:
     """
-    Construye la gramática por defecto.
+    Construye una gramática con las features dadas como terminales REAL.
+
+    features: nombres de features permitidas. Si es None, solo features OHLC
+        (las que no requieren columnas cross-asset). Para usar cross-asset,
+        pasar `available_features(df.columns)`.
 
     POSITION:
         - IF
@@ -103,7 +113,14 @@ def build_grammar() -> Grammar:
     """
     position_nodes = (NODE_IF, POSITION_LONG, POSITION_SHORT, POSITION_FLAT)
     boolean_nodes = (NODE_AND, NODE_OR, NODE_NOT, NODE_GT, NODE_LT)
-    real_nodes = tuple(FEATURE_TERMINALS.values()) + (
+    names = ohlc_feature_names() if features is None else list(features)
+    unknown = [n for n in names if n not in FEATURE_TERMINALS]
+    if unknown:
+        raise ValueError(f"Features no registradas: {unknown}")
+    if not names:
+        raise ValueError("La gramática necesita al menos una feature")
+
+    real_nodes = tuple(FEATURE_TERMINALS[n] for n in names) + (
         NODE_ADD, NODE_SUB, NODE_MUL, NODE_DIV,
         NODE_SQRT, NODE_LOG, NODE_ABS, NODE_NEG, NODE_INV,
     )
@@ -117,4 +134,5 @@ def build_grammar() -> Grammar:
     )
 
 
+#: Gramática por defecto: solo features OHLC.
 DEFAULT_GRAMMAR = build_grammar()

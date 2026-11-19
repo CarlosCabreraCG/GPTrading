@@ -242,6 +242,24 @@ def test_serialization_preserves_evaluation(tmp_path):
     np.testing.assert_array_equal(sig1, sig2)
 
 
+def test_serialization_loads_non_default_grammar_features():
+    """
+    Un individuo con features fuera de DEFAULT_GRAMMAR (p. ej. cross-asset)
+    debe poder cargarse con la gramática por defecto.
+    """
+    from features.registry import feature_names, ohlc_feature_names
+    from gp.grammar import build_grammar
+
+    extra = [n for n in feature_names() if n not in ohlc_feature_names()]
+    if not extra:
+        pytest.skip("No hay features fuera de DEFAULT_GRAMMAR")
+    grammar = build_grammar(extra)
+
+    ind = random_individual(grammar=grammar, rng=np.random.default_rng(3))
+    ind2 = dict_to_individual(individual_to_dict(ind))
+    assert ind.node_counts() == ind2.node_counts()
+
+
 # ---------------------------------------------------------------------------
 # Tests de evolución
 # ---------------------------------------------------------------------------

@@ -25,9 +25,11 @@ import pandas as pd
 from backtest.engine import BacktestConfig, run_backtest
 from fitness.metrics import sharpe
 from fitness.objective import FitnessConfig, make_fitness_fn
-from features.engine import compute_features, drop_warmup_rows
+from features.engine import compute_features, drop_warmup_rows, resolve_features
+from features.registry import FEATURES
 from gp.evaluator import EvalContext
 from gp.evolution import EvolutionConfig, EvolutionResult, evolve
+from gp.grammar import build_grammar
 from validation.folds import Fold, WFConfig, generate_folds
 from dataclasses import replace
 
@@ -63,14 +65,17 @@ class WalkForwardResult:
 def _build_context_and_split(
     is_df: pd.DataFrame,
     oos_df: pd.DataFrame,
+    feature_names: list[str] | None = None,
 ) -> tuple[EvalContext, pd.DataFrame, EvalContext, pd.DataFrame]:
     """
     Calcula features sobre IS+OOS juntos y recorta el warm-up inicial.
 
+    feature_names: features a calcular (None = todas las disponibles).
+
     Devuelve (ctx_is, df_is_aligned, ctx_oos, df_oos_aligned).
     """
     combined = pd.concat([is_df, oos_df])
-    feats = compute_features(combined)
+    feats = compute_features(combined, names=feature_names)
 
     # Eliminar filas con NaN en TODAS las features (warm-up inicial)
     valid_mask = feats.notna().all(axis=1)
@@ -114,6 +119,7 @@ def run_walk_forward(
     symbol: str,
     initial_capital: float = 10_000.0,
     verbose: bool = False,
+    strict: bool = False,
 ) -> WalkForwardResult:
     """
     Ejecuta WFO completo.
@@ -124,6 +130,9 @@ def run_walk_forward(
     fitness_config: configuración del fitness.
     initial_capital: capital inicial del primer fold.
     verbose: si True, imprime progreso por fold.
+    strict: si True, falla si alguna feature registrada no puede calcularse
+        por falta de columnas (p. ej. olvidar el merge de DXY). Si False,
+        se excluyen con WARNING y la gramática solo usa las disponibles.
     """
     folds = generate_folds(ohlc, wf_config)
     if verbose:
@@ -140,6 +149,13 @@ def run_walk_forward(
         size=fitness_config.size,
     )
 
+    # Features y gramática según las columnas presentes (OHLC + cross-asset).
+    # Las excluidas por columnas ausentes dan WARNING (o ValueError si strict).
+    feature_names = resolve_features(ohlc.columns, strict=strict)
+    grammar = build_grammar(feature_names)
+    if verbose:
+        print(f"Features disponibles: {len(feature_names)}/{len(FEATURES)}")
+
     fold_results: list[FoldResult] = []
     current_capital = initial_capital
 
@@ -148,7 +164,9 @@ def run_walk_forward(
             print(f"\n{fold}")
 
         # 1. Features IS y OOS por separado (evita look-ahead entre bloques)
-        ctx_is, df_is, ctx_oos, df_oos = _build_context_and_split(fold.is_df, fold.oos_df)
+        ctx_is, df_is, ctx_oos, df_oos = _build_context_and_split(
+            fold.is_df, fold.oos_df, feature_names
+        )
 
         if len(df_is) < wf_config.min_is_size or len(df_oos) < wf_config.min_oos_size:
             if verbose:
@@ -164,7 +182,7 @@ def run_walk_forward(
         evo_result: EvolutionResult = evolve(
             fitness_fn=fitness_fn,
             config=fold_evo_config,
-            grammar=__import__("gp.grammar", fromlist=["DEFAULT_GRAMMAR"]).DEFAULT_GRAMMAR,
+            grammar=grammar,
         )
 
         if verbose:
