@@ -57,7 +57,7 @@ def split_development_final(
     n_dev = n - n_final
     if n_final < 500: # antes 1000 para 15m, 500 para 4h
         raise ValueError(
-            f"Final test demasiado pequeño: {n_final} velas (mínimo 1000). "
+            f"Final test demasiado pequeño: {n_final} velas (mínimo 500). "
             f"Ratio {config.final_test_ratio} sobre {n} filas."
         )
     development = df.iloc[:n_dev].copy()
