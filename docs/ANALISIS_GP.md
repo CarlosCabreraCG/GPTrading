@@ -177,7 +177,8 @@ del IS (p. ej. 4 trimestres), o validación interna anidada (embargo entre bloqu
 
 - `_max_if_nesting` duplicada en `gp/individual.py` y `gp/operators.py`;
   `import copy` dentro del bucle de `evolve`; `__import__` en `walk_forward` (ya listado).
-- `scripts/run_wfo.py`: argumentos `--is-ratio`, `--min-is-size`, `--min-oos-size` no se usan.
+- `scripts/run_wfo.py`: `--min-is-size` y `--min-oos-size` no se usan en ningún sitio e
+  `--is-ratio` solo se vuelca a los metadatos (los folds se definen por `--is-months`/`--oos-months`).
 - `data/loader.py::download_load(symbol=...)` ignora `symbol` (llama `download_yf()` con
   EURUSD por defecto) y `download_yf` añade `=X` (inválido para oro/índices en yfinance).
 - Semilla por fold `seed+fold.index`: seeds 42 y 43 comparten secuencias desplazadas;
