@@ -1,4 +1,3 @@
-```markdown
 # CLAUDE.md — trading_gp
 
 Guía de contexto para Claude que continúe este proyecto.
@@ -12,13 +11,20 @@ Sistema de Genetic Programming (GP) tipado para descubrir reglas de trading
 sobre forex, metales y materias primas. Pipeline completo, causal, sin look-ahead,
 con WFO honesto, costes por símbolo y final test intocable.
 
-**Resultado empírico: negativo.** GP con indicadores clásicos + features cross-asset
+> ⚠️ **Lee `docs/ANALISIS_GP.md` antes de fiarte de los números de este documento.**
+> La auditoría detectó que el Sharpe de buy & hold es una constante, que el IC95% del
+> Sharpe es ~44x demasiado estrecho y que el GP apenas explora (77% de árboles iniciales
+> constantes). El "resultado negativo" de abajo está **pendiente de re-medir**.
+
+**Resultado empírico (provisional): negativo.** GP con indicadores clásicos + features cross-asset
 no encuentra edge robusto en forex ni oro, en 5 años de datos, con costes realistas.
 El único resultado que batió a buy & hold (Sharpe +0.80, oro+plata+DXY, seed 42)
 cayó a +0.25 con seed 123. No robusto a la aleatoriedad de GP.
 
-**La infraestructura es sólida y reutilizable.** aunque cuando se añadieron otros features de Cross, hubo tests que fallaron, antes de eso todos los test funcionaban..
-El HANDOFF.md completo tiene todos los detalles.
+**La infraestructura es sólida y reutilizable.** Los 350 tests pasan
+(`pytest tests/ -q -W error::RuntimeWarning`).
+`HANDOFF.md` está en `.gitignore` y **no existe en el repo**; si no lo tienes, la
+referencia equivalente es `docs/ANALISIS_GP.md`.
 
 ---
 
@@ -50,7 +56,7 @@ El HANDOFF.md completo tiene todos los detalles.
 
 ### Lo que SÍ debes hacer
 
-1. **Leer HANDOFF.md antes de tocar nada.** Tiene la arquitectura completa,
+1. **Leer `docs/ANALISIS_GP.md` (y HANDOFF.md si lo tienes en local) antes de tocar nada.** Tiene la arquitectura completa,
    las correcciones aplicadas (Tandas 1-3), y los resultados empíricos.
 2. **Correr `pytest tests/ -v -W error::RuntimeWarning` antes y después de
    cualquier cambio.** Los warnings de numpy se convierten en errores para
@@ -81,10 +87,12 @@ trading_gp/
 ├── experiments/               tracker, storage
 ├── scripts/                   run_gp, run_wfo, run_all_wfo, audit_backtester,
 │                              evaluate_strategy
-├── tests/                     ~100 tests
+├── tests/                     350 tests (conftest.py genera columnas cross-asset)
+├── test_final/                Scripts del final test (NO ejecutar sin orden del usuario)
+├── docs/                      ANALISIS_GP.md (auditoría) + diag_gp.py (diagnóstico)
 ├── main.py                    Orquestador
 ├── .env / .env.example        Costes por símbolo
-├── HANDOFF.md                 Documento completo de traspaso
+├── HANDOFF.md                 Traspaso completo (gitignored, puede no existir)
 └── CLAUDE.md                  Este documento
 ```
 
@@ -105,7 +113,7 @@ python -m pytest tests/ -v -W error::RuntimeWarning
 
 ```bash
 python -m scripts.audit_backtester \
-    --csv data_files/XAUUSD_X_15m_5y.csv \
+    --csv data_files/xauusd_15m_5y.csv \
     --output experiments_output/audit \
     --n-bars 2000 --period 100
 ```
@@ -114,7 +122,7 @@ python -m scripts.audit_backtester \
 
 ```bash
 python -m scripts.run_wfo \
-    --csv data_files/XAUUSD_X_15m_5y.csv \
+    --csv data_files/xauusd_15m_5y.csv \
     --output experiments_output/wfo_gold_dryrun \
     --is-months 12 --oos-months 3 --dry-run
 ```
@@ -123,7 +131,7 @@ python -m scripts.run_wfo \
 
 ```bash
 python -m scripts.run_wfo \
-    --csv data_files/XAUUSD_X_15m_5y.csv \
+    --csv data_files/xauusd_15m_5y.csv \
     --output experiments_output/wfo_gold_v5 \
     --is-months 12 --oos-months 3 \
     --population 30 --generations 8 \
@@ -132,6 +140,8 @@ python -m scripts.run_wfo \
 ```
 
 Para H4, añadir `--bars-per-month 128` (15m: default 2100).
+Para validar con 3 seeds usa seeds muy separadas (p. ej. 42, 1042, 2042): la semilla
+por fold es `seed + fold.index`, así que 42 y 43 comparten secuencias desplazadas.
 
 ### Correr los 4 WFOs baseline en serie
 
@@ -188,15 +198,21 @@ FEATURES["dxy_ret_1"] = FeatureSpec(
 )
 ```
 
-**Problema conocido pendiente:** los fixtures de tests (`synthetic_ohlc`,
-`ohlc_1`, etc.) no incluyen columnas cross-asset. Al añadir features
-cross-asset, los tests de `test_features.py`, `test_wfo.py`,
-`test_robustness.py` fallan con `KeyError`. Solución pendiente:
-`conftest.py` con fixture dinámico que añada las columnas extra necesarias,
-o separar `FEATURES` (OHLC) de `CROSS_ASSET_FEATURES` con un flag
-`include_cross_asset` en `compute_features`.
+**Fixtures de tests:** `tests/conftest.py` genera dinámicamente las columnas
+cross-asset a partir de `required_columns()`, así que añadir features cross-asset ya no
+rompe `test_features.py`, `test_wfo.py` ni `test_robustness.py`.
 
-## Resultados empíricos (post-correcciones)
+Los datos cross-asset (DXY, plata, WTI) y el script de merge **no están en el repo**
+(`data_files/` ignorado; `check_cross.py`/`datastractor.py` borrados), por lo que esos
+resultados no son reproducibles desde aquí. Verifica además que todas las fuentes usen
+la misma convención de timestamp (apertura de vela) para evitar look-ahead de una barra.
+
+## Resultados empíricos (post-correcciones) — ⚠️ columnas `IC95%` y `vs B&H` NO FIABLES
+
+`bh_sharpe` es una constante (`sqrt(bars_per_year/N)`) y el IC95% usa una fórmula con
+unidades mezcladas (`docs/ANALISIS_GP.md` §2.1–2.2). Solo el Sharpe stitched es
+informativo, y aun así sin significancia estadística demostrada. Re-medir (Fase A del
+plan) antes de citar estos valores.
 
 | Instrumento | TF | Folds | Sharpe stitched | IC95% | vs B&H | Veredicto |
 |---|---|---|---|---|---|---|
@@ -210,7 +226,8 @@ o separar `FEATURES` (OHLC) de `CROSS_ASSET_FEATURES` con un flag
 | XAUUSD + XAGUSD + DXY + WTI | 15m | 11 | +0.63 (seed 42) | [0.49, 0.77] | +0.04 | Diluye |
 
 **No reintentar estas combinaciones sin cambiar algo estructural**
-(features, gramática, fitness, período de datos, o instrumento).
+(features, gramática, fitness, período de datos, o instrumento) **o sin haber
+corregido primero la evaluación y la búsqueda GP** (ver `docs/ANALISIS_GP.md` §5).
 
 ---
 
@@ -225,9 +242,10 @@ o separar `FEATURES` (OHLC) de `CROSS_ASSET_FEATURES` con un flag
 4. **Otras métricas de fitness:** Sortino, Calmar, Profit Factor como
    métrica primaria.
 5. **Tanda 4 (GP):** ramped half-and-half, constantes efímeras, LOG/SQRT
-   con NaN. Bajo impacto esperado.
+   con NaN. La auditoría la reclasifica como **alto impacto** (ANALISIS_GP §1.1–1.2).
 6. **Tanda 5 (limpieza):** vectorizar backtester, eliminar duplicación en
-   `engine.py`, `__import__` en `walk_forward`. No urgente.
+   `engine.py`, `__import__` en `walk_forward`. Vectorizar es **prerrequisito**
+   de escalar la búsqueda GP (ANALISIS_GP §1.7).
 
 ---
 
@@ -246,11 +264,11 @@ o separar `FEATURES` (OHLC) de `CROSS_ASSET_FEATURES` con un flag
 
 ## Notas para Claude
 
-- **El proyecto está en un estado de "resultado negativo documentado".**
-  No intentes "arreglarlo" añadiendo más features o cambiando parámetros
-  sin una hipótesis clara. El espacio (features clásicas + gramática
-  IF anidados + costes realistas) no contiene señal explotable en estos
-  instrumentos.
+- **El proyecto tiene un "resultado negativo provisional".** No lo des por
+  concluyente: la auditoría (`docs/ANALISIS_GP.md`) muestra que la evaluación y la
+  búsqueda GP tenían defectos. No añadas features ni cambies parámetros sin una
+  hipótesis clara; el orden recomendado es Fase A (evaluación) → B (búsqueda GP)
+  → C (escala) → D (estructural).
 - **Si el usuario pide continuar**, la única vía con potencial real es
   cambiar algo estructural: gramática (score continuo), features de
   contexto (hora, día), u otro instrumento (índices, Brent).
@@ -274,8 +292,10 @@ o separar `FEATURES` (OHLC) de `CROSS_ASSET_FEATURES` con un flag
 
 ## Tarea activa (actualizar al cambiar de foco)
 
-1. Hacer escalable la creación de tests al añadir instrumentos (data-driven).
+1. ~~Hacer escalable la creación de tests al añadir instrumentos (data-driven).~~
+   **Hecho** (`conftest.py` + `required_columns()`, `test_costs` parametrizado).
 2. Añadir features de contexto: hora del día, día de la semana, volatilidad relativa.
-3. Evaluar Tandas 4 y 5 del HANDOFF.md solo si son relevantes tras lo anterior.
+3. Evaluar Tandas 4 y 5: **sí son relevantes** (ver `docs/ANALISIS_GP.md` §4–5).
+   Antes de la tarea 2 conviene cerrar la Fase A del plan (evaluación honesta).
 
 Orden: 1 → 2 → 3. No empezar la siguiente sin cerrar la anterior.
