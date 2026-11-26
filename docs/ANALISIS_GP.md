@@ -334,6 +334,8 @@ añadir un test.
 5. Inicialización: raíz IF, ramped half-and-half, rechazo de constantes, dedupe (1.1).
 6. Normalización causal de features + terminal ERC (1.2).
 7. Fitness con penalizaciones graduadas (1.5) y robustez en sub-bloques del IS (1.6).
+   **Confirmado empíricamente (EVAL_FOLD §9):** con alpha + exposición ≤0.5 + turnover ≤0.03 el 100% de los individuos es `-inf`:
+   las penalizaciones graduadas son prerrequisito, no opcionales.
    **Añadir:** fitness como exceso sobre buy & hold / neutral a la dirección: el GP converge a
    posiciones constantes LONG/SHORT que solo siguen la deriva del IS (ver `docs/EVAL_FOLD_XAUUSD.md` §7).
 8. Métricas de salud del GP en cada run (log): % `-inf` gen0, nº de señales distintas,

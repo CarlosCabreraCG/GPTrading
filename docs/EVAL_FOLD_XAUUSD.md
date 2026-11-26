@@ -216,3 +216,45 @@ Esta recomendación **se suma** a las de la sección 5 y debería ir en la Fase 
 
 No. Todo lo anterior usa solo OHLC de XAUUSD (20 features). Las "reglas de cruce" son close contra sus propias medias.
 Las features cross-asset (DXY, XAG, WTI) no se han usado en este diagnóstico (no hay datos en el repo).
+
+---
+
+## 9. Variantes de fitness sobre la misma matriz (4 folds × 3 semillas, 100×20)
+
+Mismos folds (1, 5, 9, 13), semillas (42, 1042, 2042) y datos que §7. Implementación: rama `feat/fitness-alpha`
+(`fitness_mode`, `max_abs_net_exposure`, `max_turnover_ratio`). Informes en `experiments_output/diag_fold/matrix_*`.
+
+| Variante | `% -inf` medio | Exposición del mejor | Sharpe IS medio | Sharpe OOS medio (>0) | **Alpha OOS medio (>0)** |
+|---|---|---|---|---|---|
+| A. raw (Sharpe absoluto, turnover ≤0.15) | 35% | 11/12 casi constante (≥96%) | +0.80 | +1.50 (9/12) | **−1.17 (4/12)** |
+| B. alpha (neutral a la dirección) | 32% | 11/12 casi constante | −0.39 | −0.83 (3/12) | **−1.67 (3/12)** |
+| C. alpha + |exposición neta| ≤ 0.5 | 38% | 12/12 ~50/50, 400–700 transiciones en OOS | −2.53 | −3.57 (1/12) | **−3.72 (1/12)** |
+| D. alpha + exposición ≤ 0.5 + turnover ≤ 0.03 | **100%** | no hay individuos válidos | n/a | n/a | n/a |
+
+(Con un solo bloque OOS de 3 meses el error estándar del Sharpe anualizado es ~2.4 por celda: ninguna cifra individual es
+concluyente; lo informativo son los patrones consistentes en las 12 celdas.)
+
+### Lectura
+
+1. **A → B:** el modo alpha elimina el "Sharpe OOS" inflado de A (+1.50 pasa a −0.83): confirma que aquel número venía de seguir
+   la tendencia. Pero B **sigue convergiendo a posiciones casi constantes** (el alpha de una constante es ~0 − costes, y a
+   partir de ahí el GP solo añade unas decenas de cambios que sobreajustan el IS: alpha IS hasta +1.6, OOS medio −1.7).
+2. **C:** forzar equilibrio (|exposición| ≤ 0.5) empuja al GP a reglas ~50/50 que cambian de lado 400–700 veces por trimestre
+   (1 600–2 800 en el IS). Con 0.5 USD por operación los costes las destruyen: **ningún individuo tiene fitness IS positivo**
+   (mejor medio −2.76). No es "no hay edge" sino que lo único fácilmente alcanzable con esa restricción es ruido que paga costes.
+3. **D:** al exigir además turnover ≤0.03 (≤ ~750 transiciones en el IS), **ningún individuo de la población (2 000 evaluaciones por
+   corrida) cumple a la vez** mínimo de trades, exposición equilibrada y turnover bajo: el 100% es `-inf` en todas las generaciones,
+   así que el "mejor" que reporta el script es el primer individuo de la población, sin significado.
+   Es la evidencia directa del problema del **precipicio `-inf`** (ANALISIS §1.5): con restricciones duras y una población inicial
+   casi aleatoria, la región factible está vacía en la práctica y no hay gradiente hacia ella.
+
+### Conclusiones y siguiente paso
+
+- El fitness neutral a la dirección es **necesario** (corrige un sesgo real), pero **no suficiente**.
+- Para poder concluir algo sobre "edge" hace falta antes que el GP *pueda buscar* en la región útil (equilibrada y de baja rotación):
+  **penalizaciones graduadas en lugar de `-inf`** (déficit de trades, exceso de turnover, exceso de exposición como violaciones continuas)
+  e **inicialización que garantice individuos factibles** (ANALISIS §1.1, §1.5). Este es ahora el siguiente paso de mayor prioridad.
+- Hasta entonces, ninguna de estas corridas permite afirmar ni descartar edge en XAUUSD 15m: A está contaminada por la deriva,
+  B/C por costes y búsqueda, D por infactibilidad.
+- Recomendación de uso inmediato: en `run_wfo`, usar `--fitness-mode alpha` para cualquier experimento nuevo y reportar siempre exposición neta y B&H
+  del mismo bloque (`scripts/check_exposure.py`).

@@ -93,6 +93,7 @@ def main() -> None:
     ap.add_argument("--min-trades", type=int, default=20)
     ap.add_argument("--fitness-mode", choices=["raw", "alpha"], default="raw")
     ap.add_argument("--max-net-exposure", type=float, default=None)
+    ap.add_argument("--max-turnover-ratio", type=float, default=0.15)
     ap.add_argument("--is-months", type=int, default=12)
     ap.add_argument("--oos-months", type=int, default=3)
     ap.add_argument("--bars-per-month", type=int, default=2100)
@@ -124,6 +125,7 @@ def main() -> None:
 
     fcfg = FitnessConfig(
         symbol=symbol, min_trades=args.min_trades,
+        max_turnover_ratio=args.max_turnover_ratio,
         fitness_mode=args.fitness_mode, max_abs_net_exposure=args.max_net_exposure,
     )
     bt_cfg = BacktestConfig(symbol=symbol, costs=fcfg.costs, size=fcfg.size)
@@ -305,6 +307,7 @@ def main() -> None:
             "population": args.population, "generations": args.generations,
             "seed": args.seed, "fold_seed": evo.seed,
             "fitness_mode": args.fitness_mode, "max_net_exposure": args.max_net_exposure,
+            "max_turnover_ratio": args.max_turnover_ratio,
             "n_evals": len(records), "elapsed_s": elapsed,
             "n_features": len(names),
         },
@@ -336,6 +339,7 @@ def main() -> None:
             "population": args.population, "generations": args.generations,
             "seed": args.seed,
             "fitness_mode": args.fitness_mode, "max_net_exposure": args.max_net_exposure,
+            "max_turnover_ratio": args.max_turnover_ratio,
         },
         is_metrics={"sharpe_is": best_info["sharpe_is"], "fitness_is": res.best_fitness},
         oos_metrics={"sharpe_oos": best_info["sharpe_oos"], "trades_oos": best_info["trades_oos"]},
