@@ -1,0 +1,6 @@
+pandas>=2.2
+numpy>=1.26
+scipy>=1.11
+pytest>=8.0
+# Solo necesario para data/loader.py (descarga desde Yahoo Finance)
+yfinance>=0.2
