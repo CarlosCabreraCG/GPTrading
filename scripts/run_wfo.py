@@ -20,6 +20,8 @@ import json
 import time
 from pathlib import Path
 
+import pandas as pd
+
 from data.cleaner import load_and_clean
 from data.splitter import SplitConfig, describe_split, split_development_final
 from experiments.tracker import ExperimentTracker
@@ -43,6 +45,9 @@ def main():
     parser.add_argument("--tracker", default="experiments_output/tracker.jsonl")
     parser.add_argument("--final-test-ratio", type=float, default=0.10)
     parser.add_argument("--final-test-path", default=None)
+    parser.add_argument("--final-test-start", default=None,
+                        help="Fecha (YYYY-MM-DD) fija de inicio del final test; "
+                             "sustituye a --final-test-ratio.")
     parser.add_argument("--population", type=int, default=30)
     parser.add_argument("--generations", type=int, default=8)
     parser.add_argument("--is-ratio", type=float, default=0.8)
@@ -93,6 +98,9 @@ def main():
         final_test_ratio=args.final_test_ratio,
         save_final_test=True,
         final_test_path=final_test_path,
+        final_test_start=(
+            pd.Timestamp(args.final_test_start) if args.final_test_start else None
+        ),
     )
     development, final_test = split_development_final(df, split_config)
     print()

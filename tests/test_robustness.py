@@ -168,6 +168,25 @@ def test_split_accepts_minimum_final_test():
     assert len(development) == 4500
 
 
+def test_split_by_fixed_start_date_is_stable():
+    """La frontera por fecha no cambia aunque el dataset crezca por el final."""
+    df = _flat_ohlc(6000)
+    start = df.index[5000]
+    config = SplitConfig(final_test_start=start, save_final_test=False)
+    dev, final = split_development_final(df, config)
+    assert len(dev) == 5000 and final.index[0] == start
+    # Con más datos al final, el development no cambia
+    dev2, _ = split_development_final(_flat_ohlc(7000), config)
+    assert len(dev2) == 5000 and dev2.index[-1] == dev.index[-1]
+
+
+def test_split_fixed_start_rejects_small_final_test():
+    df = _flat_ohlc(6000)
+    config = SplitConfig(final_test_start=df.index[5600], save_final_test=False)
+    with pytest.raises(ValueError, match="Final test demasiado pequeño"):
+        split_development_final(df, config)
+
+
 def test_tracker_n_trials(tmp_path):
     from experiments.tracker import ExperimentTracker
     tracker = ExperimentTracker(tmp_path / "t.jsonl", symbol="EURUSD")

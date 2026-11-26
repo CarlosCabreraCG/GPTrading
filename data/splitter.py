@@ -25,6 +25,10 @@ class SplitConfig:
     save_final_test: bool = True
     #: Ruta donde guardar el final_test si save_final_test=True.
     final_test_path: Path | None = None
+    #: Si se indica, el final test empieza en esta fecha (inclusive) y
+    #: `final_test_ratio` se ignora. Fija la frontera aunque el CSV cambie.
+    final_test_start: pd.Timestamp | None = None
+
     def __post_init__(self):
         if not (0.0 < self.final_test_ratio < 0.5):
             raise ValueError(
@@ -53,12 +57,19 @@ def split_development_final(
         raise ValueError("El DataFrame debe estar ordenado cronológicamente.")
 
     n = len(df)
-    n_final = int(round(n * config.final_test_ratio))
-    n_dev = n - n_final
+    if config.final_test_start is not None:
+        n_dev = int(df.index.searchsorted(pd.Timestamp(config.final_test_start), side="left"))
+        n_final = n - n_dev
+        if n_dev == 0:
+            raise ValueError("final_test_start es anterior al primer dato: no queda development.")
+    else:
+        n_final = int(round(n * config.final_test_ratio))
+        n_dev = n - n_final
     if n_final < 500: # antes 1000 para 15m, 500 para 4h
         raise ValueError(
             f"Final test demasiado pequeño: {n_final} velas (mínimo 500). "
-            f"Ratio {config.final_test_ratio} sobre {n} filas."
+            f"Ratio {config.final_test_ratio} sobre {n} filas "
+            f"(final_test_start={config.final_test_start})."
         )
     development = df.iloc[:n_dev].copy()
     final_test = df.iloc[n_dev:].copy()
