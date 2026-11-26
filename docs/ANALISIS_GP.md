@@ -259,6 +259,43 @@ stitched (PnL aditivo vs reescala multiplicativa) son engañosos. Mejor: unidade
 
 ---
 
+## 2b. Debilidades adicionales (revisión posterior)
+
+### 2b.1 El final test se define por porcentaje, no por fecha (ALTO)
+
+`data/splitter.py::split_development_final` toma el último `final_test_ratio` (10%) del
+CSV que se cargue. Si el CSV se redescarga o amplía, o si el `inner` merge cross-asset
+cambia el nº de barras, la frontera se desplaza: datos usados para desarrollar pueden caer
+dentro del "final test", y cada combinación de activos tiene un final test distinto. No hay
+embargo entre el último OOS y el final test, y 10% de 5 años (~6 meses) es un único
+régimen de mercado: poca potencia estadística.
+**Arreglo:** fijar una fecha de corte constante (`--final-test-start`, ver `SplitConfig.final_test_start`)
+y registrarla en el tracker; considerar un final test más largo y un embargo.
+
+### 2b.2 `test_final/` obsoleto y confuso (MEDIO)
+
+Los scripts de `test_final/` no son el final test real (ese es `validation/final_test.py`),
+usan `WFConfig(is_ratio=..., oos_ratio=...)` (campos que ya no existen → `TypeError`) y un CSV
+inexistente (`eurusd_15m_60d.csv`). Uno tiene typo (`fintal_test_system.py`). Eliminados.
+
+### 2b.3 Costes optimistas (MEDIO)
+
+- `CostModel.swap_per_night` no se usa en el backtester: posiciones que duran días no pagan carry.
+- Spread constante: no se ensancha en rollover, noticias ni sesión asiática, justo donde un
+  GP en 15m tiende a operar. Sesga a favor de la estrategia.
+**Arreglo:** aplicar swap por noche mantenida y un multiplicador de spread por franja horaria
+(parámetro del backtest, con test de contabilidad).
+
+### 2b.4 Sin convención de zona horaria (MEDIO, bloquea features de contexto)
+
+`data/loader.py` lee `datetime` naive (`%d/%m/%Y %H:%M`) sin zona ni DST. Si el dato está en
+hora de broker (con DST) o en UTC no está documentado. Las features de hora/sesión/día de la
+"Tarea activa 2" quedarían desplazadas 1 h la mitad del año.
+**Arreglo:** decidir y documentar la convención (recomendado UTC), normalizar en el loader y
+añadir un test.
+
+---
+
 ## 3. Qué SÍ está bien (no lo rompas)
 
 - Backtester: ejecución al open de t+1, costes por símbolo, cierre forzado al final del
@@ -289,6 +326,7 @@ stitched (PnL aditivo vs reescala multiplicativa) son engañosos. Mejor: unidade
 1. Corregir B&H (2.1) + test de regresión.
 2. Corregir IC/DSR (2.2) + test de ruido puro (falsos positivos ≈5%).
 3. Corregir `oos_return` (2.3) + test.
+   (Antes de re-ejecutar: fijar la fecha de corte del final test, 2b.1.)
 4. Re-ejecutar `scripts/run_wfo` oro 15m (seed 42/1042/2042) y **reemplazar la tabla de
    resultados de CLAUDE.md** con números válidos. Registrar en tracker.
 
@@ -307,8 +345,8 @@ stitched (PnL aditivo vs reescala multiplicativa) son engañosos. Mejor: unidade
 
 **Fase D — Cambios estructurales (hipótesis a probar, una por experimento)**
 11. Operadores temporales (LAG/CROSS/rolling) (1.3).
-12. Features de contexto (hora, sesión, día, vol relativa) y cross-asset multi-horizonte.
-13. Semántica de posición: min-holding / salidas ATR; H1/H4 (1.4).
+12. (Requiere 2b.4: convención de zona horaria) Features de contexto (hora, sesión, día, vol relativa) y cross-asset multi-horizonte.
+13. Costes con swap y spread variable (2b.3). Semántica de posición: min-holding / salidas ATR; H1/H4 (1.4).
 14. Solo si algo sobrevive a ≥3 seeds muy separadas **y** al IC correcto: proponer
     congelar y ejecutar el final test (decisión exclusiva del usuario).
 
