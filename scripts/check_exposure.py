@@ -28,7 +28,7 @@ from config.settings import infer_symbol_from_path
 from data.cleaner import load_and_clean
 from data.splitter import SplitConfig, split_development_final
 from features.engine import resolve_features
-from fitness.metrics import sharpe
+from fitness.metrics import alpha_sharpe, sharpe
 from fitness.objective import FitnessConfig
 from gp.grammar import build_grammar
 from gp.serialization import _build_node_index, dict_to_tree
@@ -95,7 +95,7 @@ def main() -> None:
     bt = BacktestConfig(symbol=symbol, costs=fcfg.costs, size=fcfg.size)
 
     cache: dict[int, tuple] = {}
-    print("fold seed | OOS: long% short% flat% netExp trans  shGP   shB&H  | IS: netExp  shGP   shB&H | OOS precio")
+    print("fold seed | OOS: long% short% flat% netExp trans  shGP   shB&H  alphaOOS | IS: netExp  shGP   shB&H alphaIS | OOS precio")
     for p in sorted(Path(args.dir).glob("*/report.json")):
         rep = json.loads(p.read_text(encoding="utf-8"))
         fi, seed = rep["meta"]["fold"], rep["meta"]["seed"]
@@ -113,15 +113,16 @@ def main() -> None:
             sig = pd.Series(ind.evaluate(ctx), index=df_.index).astype(int)
             res = run_backtest(df_, sig, bt)
             const = run_backtest(df_, pd.Series(1, index=df_.index), bt)
-            return sig, sharpe(res.equity, symbol), sharpe(const.equity, symbol)
+            return (sig, sharpe(res.equity, symbol), sharpe(const.equity, symbol),
+                    alpha_sharpe(res.equity, df_['close'], symbol, bt.size))
 
-        sig_o, sh_o, bh_o = stats(df_oos, ctx_oos)
-        sig_i, sh_i, bh_i = stats(df_is, ctx_is)
+        sig_o, sh_o, bh_o, al_o = stats(df_oos, ctx_oos)
+        sig_i, sh_i, bh_i, al_i = stats(df_is, ctx_is)
         trans_o = int((sig_o.diff().fillna(0) != 0).sum())
         move = df_oos["close"].iloc[-1] / df_oos["open"].iloc[0] - 1
         print(f"{fi:>4} {seed:>5} |      {(sig_o == 1).mean():5.0%} {(sig_o == -1).mean():5.0%} "
-              f"{(sig_o == 0).mean():5.0%} {sig_o.mean():+6.2f} {trans_o:>5} {sh_o:+6.2f} {bh_o:+6.2f} "
-              f"|     {sig_i.mean():+6.2f} {sh_i:+6.2f} {bh_i:+6.2f} | {move:+.1%}")
+              f"{(sig_o == 0).mean():5.0%} {sig_o.mean():+6.2f} {trans_o:>5} {sh_o:+6.2f} {bh_o:+6.2f} {al_o:+7.2f} "
+              f"|     {sig_i.mean():+6.2f} {sh_i:+6.2f} {bh_i:+6.2f} {al_i:+6.2f} | {move:+.1%}")
 
 
 if __name__ == "__main__":

@@ -55,6 +55,10 @@ def main():
     parser.add_argument("--is-months", type=int, default=12)
     parser.add_argument("--oos-months", type=int, default=3)
     parser.add_argument("--max-turnover-ratio", type=float, default=0.15)
+    parser.add_argument("--fitness-mode", choices=["raw", "alpha"], default="raw",
+                        help="raw: Sharpe absoluto; alpha: Sharpe neutral a la dirección.")
+    parser.add_argument("--max-net-exposure", type=float, default=None,
+                        help="Rechaza individuos con |exposición neta| mayor (0-1).")
     parser.add_argument("--max-flat-ratio", type=float, default=0.90)
     parser.add_argument("--turnover-penalty", type=float, default=0.5)
     parser.add_argument("--inactivity-penalty", type=float, default=0.1)
@@ -134,6 +138,8 @@ def main():
         symbol=symbol,
         min_trades=args.min_trades,
         max_turnover_ratio=args.max_turnover_ratio,
+        fitness_mode=args.fitness_mode,
+        max_abs_net_exposure=args.max_net_exposure,
         max_flat_ratio=args.max_flat_ratio,
         turnover_penalty_weight=args.turnover_penalty,
         inactivity_penalty_weight=args.inactivity_penalty,
@@ -175,6 +181,8 @@ def main():
             "generations": args.generations,
             "min_trades": args.min_trades,
             "seed": args.seed,
+            "fitness_mode": args.fitness_mode,
+            "max_net_exposure": args.max_net_exposure,
         },
         is_metrics={},
         oos_metrics=result.metrics_aggregated,

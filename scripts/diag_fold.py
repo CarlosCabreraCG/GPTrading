@@ -91,6 +91,8 @@ def main() -> None:
     ap.add_argument("--generations", type=int, default=8)
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--min-trades", type=int, default=20)
+    ap.add_argument("--fitness-mode", choices=["raw", "alpha"], default="raw")
+    ap.add_argument("--max-net-exposure", type=float, default=None)
     ap.add_argument("--is-months", type=int, default=12)
     ap.add_argument("--oos-months", type=int, default=3)
     ap.add_argument("--bars-per-month", type=int, default=2100)
@@ -120,7 +122,10 @@ def main() -> None:
     )
     print(f"Fold {fold.index}: IS {len(df_is)} velas, OOS {len(df_oos)} velas")
 
-    fcfg = FitnessConfig(symbol=symbol, min_trades=args.min_trades)
+    fcfg = FitnessConfig(
+        symbol=symbol, min_trades=args.min_trades,
+        fitness_mode=args.fitness_mode, max_abs_net_exposure=args.max_net_exposure,
+    )
     bt_cfg = BacktestConfig(symbol=symbol, costs=fcfg.costs, size=fcfg.size)
     base_fn = make_fitness_fn(df_is, ctx_is, fcfg)
 
@@ -299,6 +304,7 @@ def main() -> None:
             "oos_range": [str(df_oos.index[0]), str(df_oos.index[-1])],
             "population": args.population, "generations": args.generations,
             "seed": args.seed, "fold_seed": evo.seed,
+            "fitness_mode": args.fitness_mode, "max_net_exposure": args.max_net_exposure,
             "n_evals": len(records), "elapsed_s": elapsed,
             "n_features": len(names),
         },
@@ -329,6 +335,7 @@ def main() -> None:
             "kind": "diag_fold", "csv": args.csv, "fold": fold.index,
             "population": args.population, "generations": args.generations,
             "seed": args.seed,
+            "fitness_mode": args.fitness_mode, "max_net_exposure": args.max_net_exposure,
         },
         is_metrics={"sharpe_is": best_info["sharpe_is"], "fitness_is": res.best_fitness},
         oos_metrics={"sharpe_oos": best_info["sharpe_oos"], "trades_oos": best_info["trades_oos"]},
