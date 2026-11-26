@@ -334,6 +334,8 @@ añadir un test.
 5. Inicialización: raíz IF, ramped half-and-half, rechazo de constantes, dedupe (1.1).
 6. Normalización causal de features + terminal ERC (1.2).
 7. Fitness con penalizaciones graduadas (1.5) y robustez en sub-bloques del IS (1.6).
+   **Añadir:** fitness como exceso sobre buy & hold / neutral a la dirección: el GP converge a
+   posiciones constantes LONG/SHORT que solo siguen la deriva del IS (ver `docs/EVAL_FOLD_XAUUSD.md` §7).
 8. Métricas de salud del GP en cada run (log): % `-inf` gen0, nº de señales distintas,
    diversidad por generación. **Criterio de éxito de la fase:** `docs/diag_gp.py` debe dar
    <30% `-inf` en gen 0 y >80% de señales distintas.

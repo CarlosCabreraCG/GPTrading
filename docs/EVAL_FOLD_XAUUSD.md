@@ -49,8 +49,9 @@ Costes XAUUSD por defecto: spread 0.30 + slippage 0.10 → **0.50 USD por operac
   no hay caché de fitness ni mecanismo de diversidad (ANALISIS §1.7).
 - Bloat controlado: tamaño medio sube a 22 (gen 4) y baja a ~10.
 - Mejor individuo: `IF(AND(GT(return_20,roc_10),GT(rolling_std_20,atr_14_norm)),SHORT,LONG)`;
-  Sharpe IS **+1.04** (103 operaciones), Sharpe OOS **−0.75**. Ejemplo típico de sobreajuste al IS
-  (un único fold, no concluyente, pero coherente con ANALISIS §1.6).
+  Sharpe IS **+1.04** (103 operaciones), Sharpe OOS **−0.75**. **Corrección (ver §7):** no es un
+  sobreajuste "clásico": esta regla está LONG el 98% del tiempo, y el oro cayó un 4% en ese OOS
+  (buy & hold: Sharpe −1.09). Es sesgo direccional, no una regla que "deje de funcionar".
 
 **Conclusión:** con 30×8 el GP "muere" antes de arrancar (no llega a ser viable hasta el final);
 con 100×20 arranca pero se estanca y se homogeneiza en ~10 generaciones. Ambas configuraciones son
@@ -149,3 +150,69 @@ y fitness (ANALISIS §1.1, §1.5). Toda feature nueva requiere test en `test_all
 - No se usaron features cross-asset (no hay datos en el repo).
 - Las cifras de la fila "Mejor GP corrida A (aprox.)" vienen de reconstruir manualmente la señal (difieren ~3% en nº de operaciones
   del informe JSON: 1 483 vs ≈1 520).
+
+---
+
+## 7. Matriz 4 folds × 3 semillas (100×20, sin cross-asset)
+
+Folds 1, 5, 9, 13 (de 17), semillas 42, 1042, 2042 (12 corridas, 24 000 evaluaciones; registradas en el tracker con `kind: diag_fold`).
+Reproducir: `scripts/diag_fold.py` por cada par, luego `python -m scripts.summarize_diag --dir experiments_output/diag_fold/matrix`
+y `python -m scripts.check_exposure --csv data_files/xauusd_15m_5y.csv --dir experiments_output/diag_fold/matrix`.
+
+### 7.1 Dinámica (consistente en las 12 corridas)
+
+| Métrica | Valor |
+|---|---|
+| % `-inf` en gen 0 | 88–98% (media 94%) |
+| Primer individuo viable | **gen 0 en todas** (con población 100 hay ~5% viables desde el inicio) |
+| % `-inf` medio durante el run | 30–43% (media 35%) |
+| Árboles distintos, pico → final | 75 de media → **30** |
+| Señales distintas con fitness finito al final | 1–22 (media **9** de 100) |
+| Mejor encontrado en gen | 2–19, mediana ~10: el estancamiento y la pérdida de diversidad se repiten |
+| Condiciones degeneradas | 20–57% (media **40%**); comparaciones feature-vs-misma 2–12% |
+| Condiciones contra una feature "pseudo-cero" | 21–60% (media **40%**) |
+
+Con población 100 el GP no muere al inicio (a diferencia de 30×8), pero **colapsa en diversidad** (9 comportamientos
+distintos de 100 al final). Pares degenerados más repetidos en las 12 corridas: `log_return_1` vs `return_1` (casi idénticas, 374),
+`rolling_std_20` vs `atr_14_norm` (624 en ambos sentidos), `roc_10` vs `roc_10` (225), `hl_range_atr_14` vs `bb_position_20` (158).
+Features más usadas por los viables: `bb_width_20`, `log_return_20`, `log_return_1`, `rolling_std_20`, `atr_14_norm`, `log_return_5`,
+`close_over_ema_20`, `roc_10`: volatilidad y retornos, otra vez, no distancia a medias.
+
+### 7.2 HALLAZGO PRINCIPAL: el GP converge a "comprar y mantener" (o "vender y mantener")
+
+| Fold | Precio en OOS | Posición del mejor (OOS) | Sharpe GP (3 semillas) | Sharpe B&H LONG | Sharpe IS GP / B&H |
+|---|---|---|---|---|---|
+| 1 | +18.5% | 99–100% LONG | +3.94 / +4.22 / +4.07 | **+4.13** | +1.36…+1.56 / +1.40 |
+| 5 | −4.0% | 96–98% LONG | −1.86 / −1.38 / −0.75 | −1.09 | +0.97…+1.33 / +0.70 |
+| 9 | −11.1% | **100% SHORT** | +3.07 / +3.34 / +2.98 | −3.05 (LONG) | +0.24…+0.26 / −0.28 |
+| 13 | +0.7% | 100% LONG | +0.22 / +0.17 / +0.04 | +0.28 | +0.36…+0.45 / +0.48 |
+
+- **Los 12 mejores individuos son direccionales constantes** (≥96% del tiempo en un solo sentido).
+  Sus pocas transiciones (4–60 en el OOS) apenas modifican el resultado: el Sharpe OOS es el de la tendencia del oro
+  en ese bloque. En los folds con subida (1, 13) igualan al B&H y no lo superan (+4.07 vs +4.13; +0.04…+0.22 vs +0.28).
+- El GP aprende **el signo de la deriva del IS** y lo mantiene: en el fold 9 el IS fue bajista (B&H −0.28), así que
+  todas las semillas se hacen SHORT y en el OOS (−11%) "ganan" Sharpe +3. Eso es persistencia de tendencia del oro
+  entre bloques consecutivos, **no habilidad de la regla**, y habría perdido igual de fuerte si el régimen hubiera girado.
+- Por tanto, el Sharpe OOS medio de **+1.50 (positivo en 9 de 12)** de la matriz **no es evidencia de edge**: refleja
+  que el oro tiene tendencia persistente trimestre a trimestre. Se anula con un benchmark adecuado (B&H o neutralidad direccional).
+- Esto cuadra con la corrida A del fold 5 (Sharpe IS −1.8 con un flip permanente): cuando el IS es plano o ruidoso el GP flipa;
+  cuando hay deriva, la acompaña.
+
+### 7.3 Por qué ocurre (y qué cambiar)
+
+El fitness es el **Sharpe absoluto** del IS, que premia cualquier sesgo direccional correcto, y la penalización de
+inactividad/turnover favorece pocas operaciones. La estrategia más barata de optimizar es "estar siempre dentro en el sentido de la deriva".
+**Recomendaciones (alta prioridad, antes de añadir más features):**
+1. Evaluar el fitness como **exceso sobre B&H** (o un Sharpe de la parte neutral a la dirección: retornos de la estrategia menos
+   `beta * retorno del mercado`) para que replicar la deriva no puntúe.
+2. Alternativa/complemento: exigir exposición equilibrada (p. ej. `|exposición neta| ≤ 0.5` y mínimo de tiempo en cada sentido) o penalizarla.
+3. Reportar siempre, junto a cada resultado, el B&H del **mismo bloque con los mismos costes** y la exposición neta del individuo
+   (`scripts/check_exposure.py`).
+4. Recordar que `_buy_and_hold_equity` del WFO está roto (ANALISIS §2.1): no usarlo como referencia hasta corregirlo.
+
+Esta recomendación **se suma** a las de la sección 5 y debería ir en la Fase B del plan (fitness), antes de las features de cruce.
+
+## 8. Respuesta a "¿necesito otros instrumentos / cross-asset?"
+
+No. Todo lo anterior usa solo OHLC de XAUUSD (20 features). Las "reglas de cruce" son close contra sus propias medias.
+Las features cross-asset (DXY, XAG, WTI) no se han usado en este diagnóstico (no hay datos en el repo).
