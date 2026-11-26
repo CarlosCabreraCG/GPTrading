@@ -374,3 +374,102 @@ def test_sharpe_uses_symbol_annualization():
     s_eurusd = sharpe(eq, "EURUSD")
     s_gold = sharpe(eq, "XAUUSD")
     assert s_eurusd != s_gold
+
+# ---------------------------------------------------------------------------
+# Fitness neutral a la dirección (alpha_sharpe / fitness_mode="alpha")
+# ---------------------------------------------------------------------------
+
+def _market_and_pnl(n=4000, seed=0, alpha_per_bar=0.0, beta=1.0, noise_std=0.01):
+    from fitness.metrics import alpha_sharpe  # noqa: F401
+    rng = np.random.default_rng(seed)
+    idx = pd.date_range("2024-01-01", periods=n, freq="15min")
+    ret = rng.normal(0.0002, 0.001, n)           # mercado con deriva positiva
+    close = pd.Series(100.0 * np.cumprod(1 + ret), index=idx)
+    pnl_m = close.diff().fillna(0.0)
+    noise = rng.normal(0, noise_std, n) if noise_std > 0 else 0.0
+    pnl_s = beta * pnl_m + alpha_per_bar + noise
+    equity = 10_000 + pnl_s.cumsum()
+    return equity, close
+
+
+def test_alpha_sharpe_zero_for_pure_market_exposure():
+    """Seguir al mercado (LONG o SHORT constante) no debe dar alpha."""
+    from fitness.metrics import alpha_sharpe
+    for beta in (1.0, -1.0, 0.5):
+        eq, close = _market_and_pnl(alpha_per_bar=0.0, beta=beta, noise_std=0.0)
+        assert alpha_sharpe(eq, close, "XAUUSD") == 0.0
+    # mientras que el Sharpe absoluto con deriva y beta=1 es claramente positivo
+    eq, close = _market_and_pnl(alpha_per_bar=0.0, beta=1.0)
+    assert sharpe(eq, "XAUUSD") > 1.0
+
+
+def test_alpha_sharpe_detects_true_alpha_independent_of_beta():
+    from fitness.metrics import alpha_sharpe
+    eq_a, close = _market_and_pnl(alpha_per_bar=0.01, beta=0.0)
+    eq_0, _ = _market_and_pnl(alpha_per_bar=0.0, beta=0.0)
+    assert alpha_sharpe(eq_a, close, "XAUUSD") > alpha_sharpe(eq_0, close, "XAUUSD") + 5.0
+
+
+def test_alpha_sharpe_degenerate_inputs():
+    from fitness.metrics import alpha_sharpe
+    idx = pd.date_range("2024-01-01", periods=10, freq="15min")
+    flat_close = pd.Series(np.full(10, 100.0), index=idx)
+    eq = pd.Series(np.full(10, 10_000.0), index=idx)
+    assert alpha_sharpe(eq, flat_close, "XAUUSD") == 0.0      # sin varianza de mercado
+    assert alpha_sharpe(eq.iloc[:2], flat_close.iloc[:2], "XAUUSD") == 0.0  # muy corto
+
+
+def test_fitness_config_alpha_validations():
+    with pytest.raises(ValueError, match="fitness_mode"):
+        FitnessConfig(symbol="EURUSD", fitness_mode="otro")
+    with pytest.raises(ValueError, match="sharpe"):
+        FitnessConfig(symbol="EURUSD", fitness_mode="alpha", primary_metric="sortino")
+    with pytest.raises(ValueError, match="max_abs_net_exposure"):
+        FitnessConfig(symbol="EURUSD", max_abs_net_exposure=1.5)
+
+
+def _mostly_long_individual(n):
+    """LONG 9 de cada 10 barras, SHORT el resto: exposición neta ~ +0.8."""
+    from gp.nodes import NODE_GT, NODE_IF, NODE_NEG, Node
+    from gp.types import GPType
+    pattern = np.array([-1.0 if (i % 10) == 0 else 1.0 for i in range(n)])
+    ctx = EvalContext(features={"p": pattern}, n=n)
+    p_node = Node(name="p", return_type=GPType.REAL, arg_types=(), func=None)
+    p_tree = TreeNode(node=p_node, children=[], feature_name="p")
+    neg = TreeNode(node=NODE_NEG, children=[p_tree], feature_name=None)
+    gt = TreeNode(node=NODE_GT, children=[p_tree, neg], feature_name=None)
+    ind = Individual(root=TreeNode(
+        node=NODE_IF,
+        children=[gt,
+                  TreeNode(node=POSITION_LONG, children=[], feature_name=None),
+                  TreeNode(node=POSITION_SHORT, children=[], feature_name=None)],
+        feature_name=None,
+    ))
+    return ind, ctx
+
+
+def test_fitness_alpha_does_not_reward_drift_following(trending_ohlc):
+    """En un mercado que solo sube, el modo alpha puntúa menos que el raw."""
+    n = len(trending_ohlc)
+    ind, ctx = _mostly_long_individual(n)
+    common = dict(symbol="EURUSD", min_trades=2, max_turnover_ratio=1.0)
+    raw = make_fitness_fn(trending_ohlc, ctx, FitnessConfig(**common))(ind)
+    alpha = make_fitness_fn(
+        trending_ohlc, ctx, FitnessConfig(fitness_mode="alpha", **common)
+    )(ind)
+    assert np.isfinite(raw) and np.isfinite(alpha)
+    assert raw > 5.0          # el Sharpe absoluto premia la deriva
+    assert alpha < raw / 5    # el alpha no
+
+
+def test_fitness_max_net_exposure_rejects_directional(trending_ohlc):
+    """Una señal casi siempre LONG se rechaza con max_abs_net_exposure bajo."""
+    n = len(trending_ohlc)
+    ind, ctx = _mostly_long_individual(n)
+    common = dict(symbol="EURUSD", min_trades=2, max_turnover_ratio=1.0)
+    ok = make_fitness_fn(trending_ohlc, ctx, FitnessConfig(**common))(ind)
+    rej = make_fitness_fn(
+        trending_ohlc, ctx, FitnessConfig(max_abs_net_exposure=0.5, **common)
+    )(ind)
+    assert np.isfinite(ok)
+    assert rej == float("-inf")
