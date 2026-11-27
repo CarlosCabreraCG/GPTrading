@@ -70,7 +70,8 @@ El HANDOFF.md completo tiene todos los detalles.
 trading_gp/
 ├── config/settings.py         Constantes, COSTS_BY_SYMBOL, get_costs,
 │                              bars_per_year, GPLimits, SplitConfig
-├── data/                      loader, cleaner, splitter, models
+├── data/                      loader, cleaner, splitter, models,
+│                              csv_tools, normalize, merge_cross
 ├── features/                  indicators, registry, engine
 ├── gp/                        types, nodes, grammar, evaluator, individual,
 │                              population, operators, evolution, serialization
@@ -93,6 +94,34 @@ Símbolos soportados: `EURUSD`, `GBPUSD`, `XAUUSD`, `XAGUSD`, `WTI`, `BRENT`,
 
 ---
 
+## Datos (`data_files/`, ignorado por git)
+
+Los CSV vienen de otro repositorio (descarga). Aquí no se descarga nada.
+Formato canónico: `{symbol}_{tf}_{period}.csv` (p. ej. `wti_15m_5y.csv`),
+columnas `datetime,open,high,low,close`, fecha `dd/mm/YYYY HH:MM`.
+No leer los CSV enteros: usar las herramientas.
+
+```bash
+# Inspección sin cargar el archivo
+python -m data.csv_tools head data_files/xauusd_15m_5y.csv      # 5 filas + chequeo
+python -m data.csv_tools tail data_files/xauusd_15m_5y.csv -n 3
+python -m data.csv_tools info data_files/xauusd_15m_5y.csv
+python -m data.csv_tools scan data_files/xauusd_15m_5y.csv      # integridad completa
+python -m data.csv_tools overlap data_files/xauusd_15m_5y.csv data_files/dxy_15m_5y.csv
+
+# Corregir nombre/formato de un CSV nuevo (alias de la fuente en SOURCE_SYMBOL_ALIASES)
+python -m data.normalize data_files/lightcmdusd_15m_5y.csv --replace
+python -m data.normalize data_files/raro.csv --symbol DXY --replace
+
+# Dataset cross-asset: OHLC del base + {sym}_close de cada cross (inner join)
+python -m data.merge_cross --base data_files/xauusd_15m_5y.csv     --cross data_files/xagusd_15m_5y.csv data_files/dxy_15m_5y.csv
+# -> data_files/xauusd_15m_5y_x_xagusd_dxy.csv (run_wfo infiere XAUUSD)
+```
+
+Un cross solo genera features si su símbolo está en `CROSS_ASSETS`
+(`features/registry.py`). DXY no cotiza 21:00-24:00 ni domingos: unir con
+DXY descarta ~25% de las velas del base.
+
 ## Comandos esenciales
 
 ### Tests
@@ -105,7 +134,7 @@ python -m pytest tests/ -v -W error::RuntimeWarning
 
 ```bash
 python -m scripts.audit_backtester \
-    --csv data_files/XAUUSD_X_15m_5y.csv \
+    --csv data_files/xauusd_15m_5y.csv \
     --output experiments_output/audit \
     --n-bars 2000 --period 100
 ```
@@ -114,7 +143,7 @@ python -m scripts.audit_backtester \
 
 ```bash
 python -m scripts.run_wfo \
-    --csv data_files/XAUUSD_X_15m_5y.csv \
+    --csv data_files/xauusd_15m_5y.csv \
     --output experiments_output/wfo_gold_dryrun \
     --is-months 12 --oos-months 3 --dry-run
 ```
@@ -123,7 +152,7 @@ python -m scripts.run_wfo \
 
 ```bash
 python -m scripts.run_wfo \
-    --csv data_files/XAUUSD_X_15m_5y.csv \
+    --csv data_files/xauusd_15m_5y.csv \
     --output experiments_output/wfo_gold_v5 \
     --is-months 12 --oos-months 3 \
     --population 30 --generations 8 \
