@@ -229,3 +229,25 @@ def test_explicit_unavailable_feature_raises(ohlc_only):
 def test_explicit_unknown_feature_raises(ohlc_only):
     with pytest.raises(ValueError, match="no registradas"):
         compute_features(ohlc_only, names=["no_existe"])
+
+
+def test_every_supported_symbol_is_cross_asset():
+    """Cualquier símbolo soportado puede fusionarse como cross y generar features."""
+    from config.settings import SUPPORTED_SYMBOLS
+    assert set(CROSS_ASSETS) == {s.lower() for s in SUPPORTED_SYMBOLS}
+    assert len(CROSS_ASSETS) == len(set(CROSS_ASSETS))
+
+
+def test_legacy_cross_feature_order_preserved():
+    """
+    xagusd, dxy, wti siguen primero y en su orden: con las mismas columnas,
+    la lista de terminales GP (y por tanto el resultado por seed) no cambia.
+    """
+    assert CROSS_ASSETS[:3] == ("xagusd", "dxy", "wti")
+    cols = {"open", "high", "low", "close", "xagusd_close", "dxy_close", "wti_close"}
+    cross = [n for n in available_features(cols) if n not in ohlc_feature_names()]
+    assert cross == [
+        "xagusd_ret_1", "spread_ret_xagusd",
+        "dxy_ret_1", "spread_ret_dxy",
+        "wti_ret_1", "spread_ret_wti",
+    ]

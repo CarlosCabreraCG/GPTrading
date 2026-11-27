@@ -8,7 +8,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from config.settings import infer_symbol_from_path
+from config.settings import SUPPORTED_SYMBOLS, infer_symbol_from_path
 from data.cleaner import load_and_clean
 from data.merge_cross import (
     CoverageLimits,
@@ -109,6 +109,15 @@ def test_no_overlap_raises(tmp_path, files):
     late = _write(make_ohlc(n=50, start="2025-01-01"), tmp_path / "dxy_15m_5y.csv")
     with pytest.raises(ValueError, match="no deja filas"):
         merge_cross(files["base"], [late])
+
+
+@pytest.mark.parametrize("symbol", [s for s in SUPPORTED_SYMBOLS if s != "XAUUSD"])
+def test_every_supported_cross_generates_features(tmp_path, files, symbol):
+    cross = _write(make_ohlc(n=200, seed=7), tmp_path / f"{symbol.lower()}_15m_5y.csv")
+    df, _ = merge_cross(files["base"], [cross])
+    feats = compute_features(df)
+    sym = symbol.lower()
+    assert {f"{sym}_ret_1", f"spread_ret_{sym}"} <= set(feats.columns)
 
 
 # ---------------------------------------------------------------------------

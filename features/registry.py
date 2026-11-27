@@ -18,6 +18,7 @@ from typing import Callable, Iterable
 import numpy as np
 import pandas as pd
 
+from config.settings import SUPPORTED_SYMBOLS
 from features import indicators as ind
 
 
@@ -166,9 +167,18 @@ FEATURES: dict[str, FeatureSpec] = {
 # Features cross-asset (generadas desde CROSS_ASSETS)
 # ---------------------------------------------------------------------------
 
-#: Activos cross-asset. Para cada `sym` se espera la columna `{sym}_close`
-#: (merge previo a compute_features). Añadir un activo aquí genera sus features.
-CROSS_ASSETS: tuple[str, ...] = ("xagusd", "dxy", "wti")
+#: Cross-assets históricos, en su orden original. Se mantienen primero para
+#: que el orden de terminales GP (y por tanto los resultados por seed) de los
+#: experimentos ya registrados no cambie.
+_LEGACY_CROSS_ASSETS: tuple[str, ...] = ("xagusd", "dxy", "wti")
+
+#: Activos cross-asset: todos los SUPPORTED_SYMBOLS. Para cada `sym` se espera
+#: la columna `{sym}_close` (ver data/merge_cross.py). Un símbolo nuevo en
+#: SUPPORTED_SYMBOLS genera sus features automáticamente. Solo se calculan las
+#: de las columnas presentes en el DataFrame (`available_features`).
+CROSS_ASSETS: tuple[str, ...] = _LEGACY_CROSS_ASSETS + tuple(
+    s.lower() for s in SUPPORTED_SYMBOLS if s.lower() not in _LEGACY_CROSS_ASSETS
+)
 
 
 def _cross_asset_features(sym: str) -> dict[str, FeatureSpec]:
