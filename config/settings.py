@@ -251,6 +251,10 @@ class DataValidation:
 
 DEFAULT_DATA_VALIDATION: Final[DataValidation] = DataValidation()
 
+#: Formato de fecha de los CSV del proyecto (dd/mm/YYYY HH:MM, sin zona horaria).
+#: Lo usan el loader, las herramientas CSV, el normalizador y el merge cross-asset.
+CSV_DATETIME_FORMAT: Final[str] = "%d/%m/%Y %H:%M"
+
 #: Horas de trading por semana por símbolo (aproximado).
 #: Forex: 24/5 = 120h. Oro: 23/5 = 115h. Índices: 6.5h/día * 5 = 32.5h.
 TRADING_HOURS_PER_WEEK: Final[dict[str, float]] = {

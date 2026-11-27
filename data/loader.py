@@ -1,6 +1,9 @@
 """
 Carga del CSV crudo. No limpia, no valida, no transforma.
 Solo lee y devuelve un DataFrame con tipos correctos.
+
+Este repositorio no descarga datos: los CSV llegan ya descargados a
+`data_files/` desde fuentes externas.
 """
 
 from __future__ import annotations
@@ -8,22 +11,29 @@ from __future__ import annotations
 from pathlib import Path
 
 import pandas as pd
-import yfinance as yf
 
-from config.settings import DEFAULT_CSV, SUPPORTED_SYMBOLS, infer_symbol_from_path
+from config.settings import CSV_DATETIME_FORMAT, DEFAULT_CSV
 
-def check_format(df):
+
+def check_format(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Verifica columnas mínimas y convierte tipos.
+
+    - `datetime` se parsea con CSV_DATETIME_FORMAT (dd/mm/YYYY HH:MM).
+    - open/high/low/close se convierten a numérico (valores inválidos -> NaN).
+
+    Columnas extra (p. ej. `xagusd_close`) se conservan tal cual.
+    """
     if "datetime" not in df.columns:
         raise ValueError(
             f"El CSV no tiene columna 'datetime'. Columnas: {list(df.columns)}"
         )
     df["datetime"] = pd.to_datetime(
         df["datetime"],
-        format="%d/%m/%Y %H:%M",
+        format=CSV_DATETIME_FORMAT,
         utc=False,
     )
 
-    # Asegurar tipos numéricos en OHLCV
     for col in ("open", "high", "low", "close"):
         if col not in df.columns:
             raise ValueError(f"Falta columna requerida: {col}")
@@ -31,25 +41,14 @@ def check_format(df):
 
     return df
 
-def download_yf(symbol: str = "EURUSD", interval: str = "15m", period: str = "5y"):
-    data = yf.download(tickers=f"{symbol}=X", period=period, interval=interval)
-
-    data = data.reset_index()
-
-    data['Datetime'] = pd.to_datetime(data['Datetime']).dt.tz_localize(None)
-    data['Datetime'] = data['Datetime'].dt.strftime('%d/%m/%Y %H:%M')
-
-    df_formatted = data[['Datetime', 'Open', 'High', 'Low', 'Close']].copy()
-    df_formatted.columns = ['datetime', 'open', 'high', 'low', 'close']
-
-    return df_formatted
 
 def load_raw_csv(path: Path | str | None = None) -> pd.DataFrame:
     """
-    Carga el CSV de velas EURUSD.
+    Carga un CSV de velas (cualquier símbolo soportado).
 
     Devuelve un DataFrame con columnas:
-        datetime (datetime64[ns, tz]), open, high, low, close
+        datetime (datetime64[ns], naive), open, high, low, close
+        (+ columnas extra del CSV, p. ej. `{sym}_close` cross-asset)
 
     No ordena, no elimina duplicados, no rellena NaNs. Eso es tarea del cleaner.
     """
@@ -61,10 +60,3 @@ def load_raw_csv(path: Path | str | None = None) -> pd.DataFrame:
     df = pd.read_csv(csv_path)
 
     return check_format(df)
-
-def download_load(symbol: str = "EURUSD", save: bool = False, path: Path | str | None = None):
-    df = download_yf()
-    df = check_format(df)
-    
-    if save: df.to_csv(DEFAULT_CSV, index=False)
-    return df
