@@ -38,8 +38,10 @@ EXPERIMENTS = [
     },
     {
         "name": "eurusd_h4",
-        "csv": "data_files/eurusd_H4_5y.csv",
+        "csv": "data_files/eurusd_4h_5y.csv",
         "output": "experiments_output/wfo_eurusd_h4_v2",
+        # 128 velas de 4h por mes (el default de run_wfo, 2100, es para 15m)
+        "extra_args": ["--bars-per-month", "128"],
     },
 ]
 
@@ -98,6 +100,7 @@ def main():
             "--csv", exp["csv"],
             "--output", exp["output"],
             *COMMON_ARGS,
+            *exp.get("extra_args", []),
         ]
 
         t0 = time.time()

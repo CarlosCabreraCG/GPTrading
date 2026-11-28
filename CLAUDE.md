@@ -76,7 +76,8 @@ referencia equivalente es `docs/ANALISIS_GP.md`.
 trading_gp/
 ├── config/settings.py         Constantes, COSTS_BY_SYMBOL, get_costs,
 │                              bars_per_year, GPLimits, SplitConfig
-├── data/                      loader, cleaner, splitter, models
+├── data/                      loader, cleaner, splitter, models,
+│                              csv_tools, normalize, merge_cross
 ├── features/                  indicators, registry, engine
 ├── gp/                        types, nodes, grammar, evaluator, individual,
 │                              population, operators, evolution, serialization
@@ -97,9 +98,50 @@ trading_gp/
 ```
 
 Símbolos soportados: `EURUSD`, `GBPUSD`, `XAUUSD`, `XAGUSD`, `WTI`, `BRENT`,
-`USA500`, `USATECH`.
+`USA500`, `USATECH`, `DXY`, `BTCUSD` (ver `SUPPORTED_SYMBOLS`).
 
 ---
+
+## Datos (`data_files/`, ignorado por git)
+
+Los CSV vienen de otro repositorio (descarga). Aquí no se descarga nada.
+Formato canónico: `{symbol}_{tf}_{period}.csv` (p. ej. `wti_15m_5y.csv`),
+columnas `datetime,open,high,low,close`, fecha `dd/mm/YYYY HH:MM`.
+No leer los CSV enteros: usar las herramientas.
+
+```bash
+# Inspección sin cargar el archivo
+python -m data.csv_tools head data_files/xauusd_15m_5y.csv      # 5 filas + chequeo
+python -m data.csv_tools tail data_files/xauusd_15m_5y.csv -n 3
+python -m data.csv_tools info data_files/xauusd_15m_5y.csv
+python -m data.csv_tools scan data_files/xauusd_15m_5y.csv      # integridad completa
+python -m data.csv_tools overlap data_files/xauusd_15m_5y.csv data_files/dxy_15m_5y.csv
+
+# Corregir nombre/formato de un CSV nuevo (alias de la fuente en SOURCE_SYMBOL_ALIASES)
+python -m data.normalize data_files/lightcmdusd_15m_5y.csv --replace
+python -m data.normalize data_files/raro.csv --symbol DXY --replace
+
+# Timeframe que la fuente no trae (p. ej. DXY 4h) a partir de 15m
+python -m data.converter data_files/dxy_15m_5y.csv --timeframe 4h   # -> dxy_4h_5y.csv
+
+# Dataset cross-asset: OHLC del base + {sym}_close de cada cross (inner join)
+python -m data.merge_cross --base data_files/xauusd_15m_5y.csv     --cross data_files/xagusd_15m_5y.csv data_files/wti_15m_5y.csv
+# -> data_files/xauusd_15m_5y_x_xagusd_wti.csv (run_wfo infiere XAUUSD)
+python -m data.merge_cross --base ... --cross ... --dry-run   # solo informe
+python -m data.merge_cross --base ... --cross ... --force     # ignora límites
+```
+
+Todo símbolo de `SUPPORTED_SYMBOLS` genera features cross (`CROSS_ASSETS`).
+Mismo timeframe obligatorio en base y cross (15m con 15m, 4h con 4h).
+
+Control de cobertura del merge (límites por defecto, calibrados con los
+datos reales): huecos interiores <= 5%, continuidad rota <= 1%, pérdida
+total <= 15%. Si se superan, el merge se rechaza indicando el cross
+culpable; `--force` lo genera igualmente. DXY y BRENT no cotizan
+21:00-24:00 ni domingos: frente a instrumentos 24h pierden 17-25% de las
+velas y se rechazan (entre ellos dos, BRENT + DXY, son compatibles).
+Los `xauusd_15m_5y_x_*dxy*.csv` de los experimentos anteriores solo se
+pueden regenerar con `--force`.
 
 ## Comandos esenciales
 
