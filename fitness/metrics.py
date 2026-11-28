@@ -48,6 +48,39 @@ def sharpe(equity: pd.Series, symbol: str) -> float:
     return float((returns.mean() / std) * np.sqrt(ann))
 
 
+def alpha_sharpe(
+    equity: pd.Series,
+    close: pd.Series,
+    symbol: str,
+    size: float = 1.0,
+) -> float:
+    """
+    Sharpe anualizado del residuo de la estrategia frente a un benchmark LONG.
+
+    Se compara el P&L por barra de la estrategia (diferencias de equity) con el
+    P&L por barra de mantener `size` unidades LONG (diferencias de close). Se
+    estima beta por mínimos cuadrados en el propio bloque y se mide el Sharpe de
+    `pnl_estrategia - beta * pnl_mercado`. Una posición constante LONG o SHORT
+    tiene residuo ~0 (solo quedan los costes), así que seguir la deriva del
+    bloque no puntúa. rf=0.
+    """
+    if len(equity) < 3:
+        return 0.0
+    pnl_s = equity.diff().fillna(0.0).to_numpy()
+    pnl_m = (size * close.diff().fillna(0.0)).to_numpy()
+    var_m = float(np.var(pnl_m))
+    if var_m <= 0:
+        return 0.0
+    beta = float(np.cov(pnl_s, pnl_m, ddof=0)[0, 1] / var_m)
+    resid = pnl_s - beta * pnl_m
+    std = float(resid.std(ddof=1))
+    # Residuo numéricamente nulo (exposición pura al mercado): sin alpha medible.
+    if std <= 1e-9 * max(float(pnl_m.std()), 1e-12):
+        return 0.0
+    ann = annualization_factor(equity.index, symbol)
+    return float((resid.mean() / std) * np.sqrt(ann))
+
+
 def sortino(equity: pd.Series, symbol: str) -> float:
     """Sortino anualizado (solo downside deviation)."""
     if len(equity) < 2:

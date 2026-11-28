@@ -27,7 +27,7 @@ import traceback
 from backtest.engine import BacktestConfig, run_backtest
 from config.settings import DEFAULT_COSTS, CostModel
 from fitness.complexity import ComplexityWeights, complexity_penalty
-from fitness.metrics import sharpe, sortino, turnover
+from fitness.metrics import alpha_sharpe, sharpe, sortino, turnover
 from fitness.metrics import compute_metrics as compute_backtest_metrics
 from gp.evaluator import EvalContext
 from gp.individual import Individual
@@ -56,7 +56,23 @@ class FitnessConfig:
     # Métrica principal
     primary_metric: str = "sharpe"    # "sharpe" o "sortino"
 
+    # Modo de fitness:
+    #   "raw":   métrica principal absoluta (comportamiento histórico).
+    #   "alpha": Sharpe del residuo frente a un benchmark LONG (no premia seguir
+    #            la deriva del IS; ver docs/EVAL_FOLD_XAUUSD.md §7). Solo sharpe.
+    fitness_mode: str = "raw"
+    # Si no es None, rechaza (-inf) individuos con |exposición neta| mayor.
+    max_abs_net_exposure: Optional[float] = None
+
     def __post_init__(self):
+        if self.fitness_mode not in ("raw", "alpha"):
+            raise ValueError(f"fitness_mode inválido: {self.fitness_mode!r}")
+        if self.fitness_mode == "alpha" and self.primary_metric != "sharpe":
+            raise ValueError("fitness_mode='alpha' solo soporta primary_metric='sharpe'")
+        if self.max_abs_net_exposure is not None and not (
+            0.0 <= self.max_abs_net_exposure <= 1.0
+        ):
+            raise ValueError("max_abs_net_exposure debe estar en [0, 1]")
         if self.costs is None:
             from config.settings import get_costs
             object.__setattr__(self, "costs", get_costs(self.symbol))
@@ -134,9 +150,19 @@ def make_fitness_fn(
         # Mínimo de trades
         if result.n_trades < config.min_trades:
             return float("-inf")
+
+        # Exposición neta (media de la señal: +1 siempre LONG, -1 siempre SHORT)
+        net_exposure = float(signals.mean())
+        if (
+            config.max_abs_net_exposure is not None
+            and abs(net_exposure) > config.max_abs_net_exposure
+        ):
+            return float("-inf")
         metrics = compute_backtest_metrics(result, config.symbol)
         # Métrica principal
-        if config.primary_metric == "sharpe":
+        if config.fitness_mode == "alpha":
+            perf = alpha_sharpe(result.equity, ohlc["close"], config.symbol, config.size)
+        elif config.primary_metric == "sharpe":
             perf = metrics["sharpe"] 
         elif config.primary_metric == "sortino":
             perf = metrics["sortino"]
@@ -160,6 +186,7 @@ def make_fitness_fn(
             "turnover_ratio": turnover_ratio,
             "flat_ratio": flat_ratio,
             "sharpe": perf,
+            "net_exposure": net_exposure,
         }
         return float(fitness)
         
